@@ -1,7 +1,5 @@
 # IS444-The-Financial-Pilot
 
-# Vue 3 + OutSystems Frontend
-
 Simple customer-facing app — Vue 3, Vite, Vue Router, Axios.
 
 ## Start
