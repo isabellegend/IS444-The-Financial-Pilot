@@ -35,3 +35,10 @@ export function getTransactionHistory(nric, { pageNo = 1, pageSize = 20 } = {}) 
     params: { Nric: nric, PageNo: pageNo, PageSize: pageSize },
   })
 }
+
+export function updateUserPercentage({ nric, savePercentage, investPercentage, spendPercentage }) {
+  return userApi.put('/UpdateUserPercentageByNRIC',
+    { savePercentage, investPercentage, spendPercentage },
+    { params: { NRIC: nric } }
+  )
+}

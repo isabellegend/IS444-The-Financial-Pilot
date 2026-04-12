@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { simulateSalaryCredit } from '../services/salaryService.js'
 import { getGoalProgress, optimizeSplit } from '../services/goalService.js'
 import { getDebitCardInfo } from '../services/accountService.js'
-import { getTransactionHistory } from '../api/users.js'
+import { getTransactionHistory, updateUserPercentage } from '../api/users.js'
 import { getDashboardMetrics } from '../api/dashboard.js'
 import { updateSplit } from '../api/chatbot.js'
 
@@ -82,6 +82,8 @@ export const useFinanceStore = defineStore('finance', () => {
   const settingsSaved       = ref(false)
   const isApplyingSplit     = ref(false)
   const isLoadingTransactions = ref(false)
+  const isUpdatingSplit     = ref(false)
+  const splitUpdateError    = ref('')
 
   // Last split event (for dashboard summary)
   const lastSplitEvent = ref({
@@ -180,9 +182,36 @@ export const useFinanceStore = defineStore('finance', () => {
   async function approveSplitSettings() {
     const s = pendingSettings.value
     if (s.save + s.invest + s.spend !== 100) return
-    splitSettings.value = { ...s }
-    settingsSaved.value = true
-    setTimeout(() => { settingsSaved.value = false }, 2500)
+
+    isUpdatingSplit.value = true
+    splitUpdateError.value = ''
+    try {
+      const nric = sessionStorage.getItem('nric') || 'T9992445Z'
+      const { data } = await updateUserPercentage({
+        nric,
+        savePercentage:   s.save,
+        investPercentage: s.invest,
+        spendPercentage:  s.spend,
+      })
+      console.log('[UpdateUserPercentage] response:', JSON.stringify(data, null, 2))
+
+      // Persist to store and session
+      splitSettings.value = { ...s }
+      sessionStorage.setItem('savePercentage',   s.save)
+      sessionStorage.setItem('investPercentage', s.invest)
+      sessionStorage.setItem('spendPercentage',  s.spend)
+
+      settingsSaved.value = true
+      setTimeout(() => { settingsSaved.value = false }, 2500)
+    } catch (err) {
+      const msg = err?.response?.data?.Errors?.[0]
+        || err?.response?.data?.message
+        || 'Failed to save settings. Please try again.'
+      splitUpdateError.value = msg
+      setTimeout(() => { splitUpdateError.value = '' }, 4000)
+    } finally {
+      isUpdatingSplit.value = false
+    }
   }
 
   async function sendChat(content) {
@@ -242,6 +271,7 @@ export const useFinanceStore = defineStore('finance', () => {
     user, balances, splitSettings, pendingSettings,
     salary, goals, transactions, debitCard, chatMessages,
     isRefreshing, isCreditingRef, isChatLoading, settingsSaved, isApplyingSplit, isLoadingTransactions,
+    isUpdatingSplit, splitUpdateError,
     lastSplitEvent,
     totalBalance, primaryGoal, primaryGoalPct, spendLimitPct,
     refreshDashboard, fetchTransactions, simulateSalary, approveSplitSettings, sendChat,

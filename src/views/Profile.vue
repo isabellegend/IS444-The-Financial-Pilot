@@ -106,13 +106,21 @@
           </div>
         </Transition>
 
+        <!-- Error toast -->
+        <Transition name="fade">
+          <div v-if="store.splitUpdateError" class="toast-error">
+            ✗ {{ store.splitUpdateError }}
+          </div>
+        </Transition>
+
         <div class="card-actions">
           <button
             class="btn btn-primary"
-            :disabled="!sumOk"
+            :disabled="!sumOk || store.isUpdatingSplit"
             @click="store.approveSplitSettings()"
           >
-            Approve Settings
+            <span v-if="store.isUpdatingSplit" class="btn-spinner" />
+            <span>{{ store.isUpdatingSplit ? 'Saving…' : 'Approve Settings' }}</span>
           </button>
           <button class="btn btn-ghost" @click="resetPending">Reset</button>
         </div>
@@ -335,11 +343,37 @@ function fmt(n) {
   font-weight: 500;
   margin-bottom: 1rem;
 }
+.toast-error {
+  background: rgba(239,68,68,0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+.btn-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .card-actions {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+.card-actions .btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* Transitions */
