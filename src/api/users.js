@@ -22,6 +22,16 @@ export function createUser(payload) {
   return userApi.post('/Users', payload)
 }
 
+export function loginUser(payload) {
+  return userApi.post('/LoginUser', payload)
+}
+
 export function registerAccount(payload) {
   return checkingApi.post('/RegisterAccount', payload)
+}
+
+export function getTransactionHistory(nric, { pageNo = 1, pageSize = 20 } = {}) {
+  return checkingApi.get('/GetTransactionHistory', {
+    params: { Nric: nric, PageNo: pageNo, PageSize: pageSize },
+  })
 }

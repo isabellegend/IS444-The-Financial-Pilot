@@ -98,7 +98,11 @@ const navItems = [
 ]
 
 function logout() {
+  console.log('[Logout] Clearing session for:', sessionStorage.getItem('fullName'))
+  sessionStorage.clear()
   localStorage.removeItem('token')
+  localStorage.removeItem('role')
+  console.log('[Logout] Session cleared.')
   router.push('/login')
 }
 </script>

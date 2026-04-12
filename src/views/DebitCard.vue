@@ -65,18 +65,27 @@
             S$ {{ fmt(store.debitCard.spendLimit - store.debitCard.spentThisMonth) }} remaining this month
           </p>
 
-          <!-- Category breakdown -->
+          <!-- Debit / Credit summary -->
           <div class="category-breakdown">
-            <div v-for="cat in categoryBreakdown" :key="cat.label" class="cat-row">
-              <span class="cat-icon">{{ cat.icon }}</span>
-              <span class="cat-label">{{ cat.label }}</span>
+            <div class="cat-row">
+              <span class="cat-icon">⬇️</span>
+              <span class="cat-label">Debited</span>
               <div class="cat-bar-track">
-                <div
-                  class="cat-bar-fill"
-                  :style="{ width: (cat.amount / store.debitCard.spentThisMonth * 100) + '%' }"
+                <div class="cat-bar-fill cat-bar-fill--debit"
+                  :style="{ width: txnSummary.total ? (txnSummary.debit / txnSummary.total * 100) + '%' : '0%' }"
                 />
               </div>
-              <span class="mono cat-amount">S$ {{ fmt(cat.amount) }}</span>
+              <span class="mono cat-amount">S$ {{ fmt(txnSummary.debit) }}</span>
+            </div>
+            <div class="cat-row">
+              <span class="cat-icon">⬆️</span>
+              <span class="cat-label">Credited</span>
+              <div class="cat-bar-track">
+                <div class="cat-bar-fill cat-bar-fill--credit"
+                  :style="{ width: txnSummary.total ? (txnSummary.credit / txnSummary.total * 100) + '%' : '0%' }"
+                />
+              </div>
+              <span class="mono cat-amount">S$ {{ fmt(txnSummary.credit) }}</span>
             </div>
           </div>
         </div>
@@ -88,33 +97,53 @@
           <h3>Recent Transactions</h3>
           <span class="label-sm">{{ store.transactions.length }} transactions</span>
         </div>
-        <div class="txn-list">
+
+        <!-- Loading skeleton -->
+        <div v-if="store.isLoadingTransactions" class="txn-loading">
+          <div v-for="n in 5" :key="n" class="txn-skeleton">
+            <div class="skeleton skeleton--icon" />
+            <div class="skeleton-lines">
+              <div class="skeleton skeleton--text" />
+              <div class="skeleton skeleton--text-sm" />
+            </div>
+            <div class="skeleton skeleton--amount" />
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="!store.transactions.length" class="txn-empty">
+          No transactions found.
+        </div>
+
+        <!-- Transaction list -->
+        <div v-else class="txn-list">
           <div
             v-for="txn in store.transactions"
-            :key="txn.id"
+            :key="txn.transactionId"
             class="txn-row"
           >
-            <div
-              class="txn-icon"
-              :style="{ background: catColor(txn.category) + '22', color: catColor(txn.category) }"
-            >
-              {{ catIcon(txn.category) }}
+            <div class="txn-icon" :class="txn.transactionType === 'CREDIT' ? 'txn-icon--credit' : 'txn-icon--debit'">
+              <svg v-if="txn.transactionType === 'CREDIT'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+              </svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+              </svg>
             </div>
+
             <div class="txn-info">
-              <span class="txn-merchant">{{ txn.merchant }}</span>
+              <span class="txn-merchant">{{ txn.narrative }}</span>
               <span class="txn-meta">
-                <span class="txn-cat">{{ txn.category }}</span>
-                · {{ txn.date }}
+                <span class="txn-ref mono">{{ txn.referenceId }}</span>
+                · {{ fmtDate(txn.transactionDate) }}
               </span>
             </div>
+
             <div class="txn-right">
-              <span
-                class="mono txn-amount"
-                :class="txn.amount > 0 ? 'amount-pos' : 'amount-neg'"
-              >
-                {{ txn.amount > 0 ? '+' : '' }}S$ {{ Math.abs(txn.amount).toFixed(2) }}
+              <span class="mono txn-amount" :class="txn.transactionType === 'CREDIT' ? 'amount-pos' : 'amount-neg'">
+                {{ txn.transactionType === 'CREDIT' ? '+' : '-' }}S$ {{ txn.amount.toFixed(2) }}
               </span>
-              <span class="txn-status" :class="'status-' + txn.status">{{ txn.status }}</span>
+              <span class="txn-balance mono">Bal: S$ {{ Number(txn.balanceAfter).toFixed(2) }}</span>
             </div>
           </div>
         </div>
@@ -124,10 +153,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useFinanceStore } from '../stores/finance.js'
 
 const store = useFinanceStore()
+
+onMounted(() => store.fetchTransactions())
 
 const limitColor = computed(() => {
   if (store.spendLimitPct >= 90) return 'var(--danger)'
@@ -135,31 +166,18 @@ const limitColor = computed(() => {
   return 'var(--purple)'
 })
 
-const categoryBreakdown = computed(() => {
-  const totals = {}
+const txnSummary = computed(() => {
+  let debit = 0, credit = 0
   for (const txn of store.transactions) {
-    if (txn.amount < 0) {
-      totals[txn.category] = (totals[txn.category] || 0) + Math.abs(txn.amount)
-    }
+    if (txn.transactionType === 'DEBIT')  debit  += txn.amount
+    else                                  credit += txn.amount
   }
-  return Object.entries(totals)
-    .map(([label, amount]) => ({ label, amount, icon: catIcon(label) }))
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 4)
+  return { debit, credit, total: debit + credit }
 })
 
-const CAT_META = {
-  Food:      { icon: '🍜', color: '#F87171' },
-  Groceries: { icon: '🛒', color: '#34D399' },
-  Entertain: { icon: '🎬', color: '#818CF8' },
-  Shopping:  { icon: '🛍️',  color: '#F59E0B' },
-  Transport: { icon: '🚗', color: '#38BDF8' },
-  Sports:    { icon: '🏃', color: '#A3E635' },
-  Salary:    { icon: '💰', color: '#00D4C8' },
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })
 }
-
-function catIcon(cat)  { return CAT_META[cat]?.icon  ?? '💳' }
-function catColor(cat) { return CAT_META[cat]?.color ?? '#8A96B0' }
 
 function fmt(n) {
   return Number(n).toLocaleString('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -375,10 +393,43 @@ function fmt(n) {
   gap: 0.15rem;
   flex-shrink: 0;
 }
+.txn-icon--debit  { background: rgba(248,113,113,0.12); color: #F87171; }
+.txn-icon--credit { background: rgba(0,212,200,0.12);  color: var(--teal); }
 .txn-amount  { font-size: 0.875rem; font-weight: 500; }
-.amount-neg  { color: var(--text); }
+.amount-neg  { color: #F87171; }
 .amount-pos  { color: var(--teal); }
-.txn-status  { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.status-settled { color: var(--text-3); }
-.status-pending { color: var(--gold); }
+.txn-ref     { color: var(--text-3); }
+.txn-balance { font-size: 0.68rem; color: var(--text-3); }
+.cat-bar-fill--debit  { background: #F87171; }
+.cat-bar-fill--credit { background: var(--teal); }
+
+/* Loading skeleton */
+.txn-loading { display: flex; flex-direction: column; gap: 0; }
+.txn-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+.skeleton--icon    { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; }
+.skeleton--text    { height: 12px; width: 140px; margin-bottom: 6px; }
+.skeleton--text-sm { height: 10px; width: 90px; }
+.skeleton--amount  { height: 14px; width: 70px; margin-left: auto; flex-shrink: 0; }
+.skeleton-lines    { flex: 1; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* Empty state */
+.txn-empty {
+  padding: 2.5rem;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 0.875rem;
+}
 </style>

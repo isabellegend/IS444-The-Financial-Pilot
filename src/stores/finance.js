@@ -2,23 +2,36 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { simulateSalaryCredit } from '../services/salaryService.js'
 import { getGoalProgress, optimizeSplit } from '../services/goalService.js'
-import { getTransactions, getDebitCardInfo } from '../services/accountService.js'
+import { getDebitCardInfo } from '../services/accountService.js'
+import { getTransactionHistory } from '../api/users.js'
 import { getDashboardMetrics } from '../api/dashboard.js'
 import { updateSplit } from '../api/chatbot.js'
 
 export const useFinanceStore = defineStore('finance', () => {
+  // ── Session helpers ────────────────────────────────────────────
+  function getInitials(name) {
+    const parts = (name || '').trim().split(/\s+/)
+    if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? '?'
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
+
+  const sessionName  = sessionStorage.getItem('fullName') || 'Alex Tan Wei Ming'
+  const sessionSave  = parseFloat(sessionStorage.getItem('savePercentage'))  || 40
+  const sessionInvest= parseFloat(sessionStorage.getItem('investPercentage'))|| 30
+  const sessionSpend = parseFloat(sessionStorage.getItem('spendPercentage')) || 30
+
   // ── State ──────────────────────────────────────────────────────
   const user = ref({
-    id: 'user-001',
-    name: 'Alex Tan Wei Ming',
-    employer: 'Meridian Tech Pte Ltd',
+    id:              sessionStorage.getItem('userId')  || 'user-001',
+    name:            sessionName,
+    employer:        'Meridian Tech Pte Ltd',
     checkingAccount: '***-***-4821',
-    avatarInitials: 'AT',
+    avatarInitials:  getInitials(sessionName),
   })
 
   const balances = ref({ save: 12450.00, invest: 8200.00, spend: 3100.00 })
-  const splitSettings = ref({ save: 40, invest: 30, spend: 30 })
-  const pendingSettings = ref({ save: 40, invest: 30, spend: 30 })
+  const splitSettings  = ref({ save: sessionSave, invest: sessionInvest, spend: sessionSpend })
+  const pendingSettings= ref({ save: sessionSave, invest: sessionInvest, spend: sessionSpend })
 
   const salary = ref({
     gross: 8500.00,
@@ -47,7 +60,7 @@ export const useFinanceStore = defineStore('finance', () => {
 
   const debitCard = ref({
     cardNumber: '**** **** **** 4821',
-    cardholderName: 'ALEX TAN WEI MING',
+    cardholderName: sessionName.toUpperCase(),
     expiry: '03/29',
     network: 'VISA',
     spendLimit: 2000.00,
@@ -58,16 +71,17 @@ export const useFinanceStore = defineStore('finance', () => {
     {
       id: 'msg-0',
       role: 'assistant',
-      content: "Hi Alex 👋 I'm your Financial Pilot AI. Ask me anything about optimising your Save, Invest, or Spend split — I'll run the numbers for your goals.",
+      content: `Hi ${sessionName.split(' ')[0]} 👋 I'm your Financial Pilot AI. Ask me anything about optimising your Save, Invest, or Spend split — I'll run the numbers for your goals.`,
       ts: Date.now() - 60000,
     },
   ])
 
-  const isRefreshing    = ref(false)
-  const isCreditingRef  = ref(false)
-  const isChatLoading   = ref(false)
-  const settingsSaved   = ref(false)
-  const isApplyingSplit = ref(false)
+  const isRefreshing        = ref(false)
+  const isCreditingRef      = ref(false)
+  const isChatLoading       = ref(false)
+  const settingsSaved       = ref(false)
+  const isApplyingSplit     = ref(false)
+  const isLoadingTransactions = ref(false)
 
   // Last split event (for dashboard summary)
   const lastSplitEvent = ref({
@@ -98,7 +112,7 @@ export const useFinanceStore = defineStore('finance', () => {
   async function refreshDashboard() {
     isRefreshing.value = true
     try {
-      const nric = 'T9992445Z'
+      const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       const { data } = await getDashboardMetrics(nric)
       balances.value = {
         save:   parseFloat(data.DepositBalance),
@@ -107,6 +121,17 @@ export const useFinanceStore = defineStore('finance', () => {
       }
     } finally {
       isRefreshing.value = false
+    }
+  }
+
+  async function fetchTransactions() {
+    isLoadingTransactions.value = true
+    try {
+      const nric = sessionStorage.getItem('nric') || 'T9992445Z'
+      const { data } = await getTransactionHistory(nric)
+      transactions.value = data
+    } finally {
+      isLoadingTransactions.value = false
     }
   }
 
@@ -188,7 +213,7 @@ export const useFinanceStore = defineStore('finance', () => {
 
     isApplyingSplit.value = true
     try {
-      const nric = 'T9992445Z'
+      const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       const { data } = await updateSplit({
         savePercentage:   split.save,
         investPercentage: split.invest,
@@ -216,10 +241,10 @@ export const useFinanceStore = defineStore('finance', () => {
   return {
     user, balances, splitSettings, pendingSettings,
     salary, goals, transactions, debitCard, chatMessages,
-    isRefreshing, isCreditingRef, isChatLoading, settingsSaved, isApplyingSplit,
+    isRefreshing, isCreditingRef, isChatLoading, settingsSaved, isApplyingSplit, isLoadingTransactions,
     lastSplitEvent,
     totalBalance, primaryGoal, primaryGoalPct, spendLimitPct,
-    refreshDashboard, simulateSalary, approveSplitSettings, sendChat,
+    refreshDashboard, fetchTransactions, simulateSalary, approveSplitSettings, sendChat,
     applySuggestedSplit,
   }
 })

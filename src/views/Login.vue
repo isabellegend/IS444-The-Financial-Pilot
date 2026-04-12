@@ -201,7 +201,6 @@
         </button>
       </form>
 
-      <p class="hint">Dev mode — any credentials will work</p>
     </div>
   </div>
 </template>
@@ -209,7 +208,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { createUser, registerAccount } from '../api/users.js'
+import { loginUser, createUser, registerAccount } from '../api/users.js'
 
 const router  = useRouter()
 const role    = ref('employee')
@@ -259,16 +258,50 @@ async function handleLogin() {
   loading.value = true
   clearMessages()
   try {
-    // TODO: replace with real OutSystems auth once API is live
-    // const { data } = await auth.login({ Username: login.value.username, Password: login.value.password })
-    // localStorage.setItem('token', data.Token)
-    await new Promise(r => setTimeout(r, 500))
-    if (!login.value.username || !login.value.password) throw new Error('Enter credentials')
-    localStorage.setItem('token', 'mock-token-dev')
-    localStorage.setItem('role', role.value)
-    router.push(role.value === 'employer' ? '/employer-portal' : '/dashboard')
+    if (role.value === 'employer') {
+      // Employer login — no API yet, keep mock
+      if (!login.value.username || !login.value.password) throw new Error('Enter credentials')
+      localStorage.setItem('token', 'mock-token-employer')
+      localStorage.setItem('role', 'employer')
+      router.push('/employer-portal')
+      return
+    }
+
+    // Employee login — POST /LoginUser
+    const { data } = await loginUser({
+      Username: login.value.username,
+      Password: login.value.password,
+    })
+
+    if (!data.IsSuccess) {
+      throw new Error('Invalid username or password.')
+    }
+
+    console.log('[LoginUser] response:', JSON.stringify(data, null, 2))
+
+    // Store session variables
+    sessionStorage.setItem('nric',            data.NRIC)
+    sessionStorage.setItem('userId',          data.Id)
+    sessionStorage.setItem('fullName',        data.FullName)
+    sessionStorage.setItem('email',           data.Email)
+    sessionStorage.setItem('savePercentage',  data.SavePercentage)
+    sessionStorage.setItem('investPercentage',data.InvestPercentage)
+    sessionStorage.setItem('spendPercentage', data.SpendPercentage)
+
+    console.log('[Session] nric:',             data.NRIC)
+    console.log('[Session] userId:',           data.Id)
+    console.log('[Session] fullName:',         data.FullName)
+    console.log('[Session] email:',            data.Email)
+    console.log('[Session] savePercentage:',   data.SavePercentage)
+    console.log('[Session] investPercentage:', data.InvestPercentage)
+    console.log('[Session] spendPercentage:',  data.SpendPercentage)
+
+    localStorage.setItem('token', 'authenticated')
+    localStorage.setItem('role',  'employee')
+    router.push('/dashboard')
   } catch (err) {
-    error.value = err.message || 'Login failed. Please try again.'
+    const msg = err.response?.data?.Errors?.[0] ?? err.message
+    error.value = msg || 'Login failed. Please try again.'
   } finally {
     loading.value = false
   }
