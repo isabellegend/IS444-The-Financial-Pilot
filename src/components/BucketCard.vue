@@ -26,9 +26,7 @@
     <div class="bucket-card__foot">
       <div class="bucket-info">
         <p class="bucket-info__label">Allocated</p>
-        <p class="bucket-info__val mono">{{ pct }}% of salary</p>
-        <p class="bucket-info__label" style="margin-top: 0.5rem;">This month</p>
-        <p class="bucket-info__val mono">+S$ {{ fmt(monthlyCredited) }}</p>
+        <p class="bucket-info__val mono">{{ pct }}%</p>
       </div>
       <CircularRing
         :percentage="pct"
@@ -82,14 +80,6 @@ function animateCounter(target) {
 
 watch(() => props.balance, (val) => animateCounter(val), { immediate: true })
 
-const monthlyCredited = computed(() => {
-  // Show how much was credited this month based on a S$8,500 salary and pct
-  return +(8500 * (props.pct / 100)).toFixed(2)
-})
-
-function fmt(n) {
-  return Number(n).toLocaleString('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 </script>
 
 <style scoped>

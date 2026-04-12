@@ -38,7 +38,7 @@
         <div class="split-card__header">
           <div>
             <h3>This Month's Split</h3>
-            <p class="label-sm">Salary credited {{ store.lastSplitEvent.date }}</p>
+            <p class="label-sm">Last credited {{ store.lastSplitEvent.date }}</p>
           </div>
           <span class="gross-badge mono">S$ {{ fmt(store.lastSplitEvent.gross) }}</span>
         </div>

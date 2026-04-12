@@ -12,34 +12,8 @@
         <span class="brand-name">Financial Pilot</span>
       </div>
 
-      <!-- Role toggle -->
-      <div class="role-toggle">
-        <button
-          type="button"
-          :class="['role-btn', { 'role-btn--active': role === 'employee' }]"
-          @click="role = 'employee'"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-          Employee
-        </button>
-        <button
-          type="button"
-          :class="['role-btn', { 'role-btn--active': role === 'employer' }]"
-          @click="role = 'employer'; mode = 'login'"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="7" width="20" height="14" rx="2"/>
-            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-          </svg>
-          Employer
-        </button>
-      </div>
-
-      <!-- Mode tabs (employees only) -->
-      <div v-if="role === 'employee'" class="mode-tabs">
+      <!-- Mode tabs -->
+      <div class="mode-tabs">
         <button
           type="button"
           :class="['mode-tab', { 'mode-tab--active': mode === 'login' }]"
@@ -57,26 +31,20 @@
       </div>
 
       <!-- Heading -->
-      <h2>
-        {{ mode === 'signup' ? 'Create your account' : role === 'employer' ? 'Employer Portal' : 'Welcome back' }}
-      </h2>
+      <h2>{{ mode === 'signup' ? 'Create your account' : 'Welcome back' }}</h2>
       <p class="login-sub">
-        {{ mode === 'signup'
-          ? 'Set up your Financial Pilot profile'
-          : role === 'employer'
-            ? 'Manage payroll for your team'
-            : 'Sign in to your account' }}
+        {{ mode === 'signup' ? 'Set up your Financial Pilot profile' : 'Sign in to your account' }}
       </p>
 
       <!-- ── SIGN IN FORM ── -->
       <form v-if="mode === 'login'" @submit.prevent="handleLogin">
         <div class="field">
           <label>Username</label>
-          <input v-model="login.username" type="text" placeholder="Enter any username" required />
+          <input v-model="login.username" type="text" placeholder="Enter your username" required />
         </div>
         <div class="field">
           <label>Password</label>
-          <input v-model="login.password" type="password" placeholder="Enter any password" required />
+          <input v-model="login.password" type="password" placeholder="Enter your password" required />
         </div>
         <p v-if="error" class="msg msg--error">{{ error }}</p>
         <button type="submit" class="submit-btn" :disabled="loading">
@@ -131,9 +99,9 @@
           <input v-model="signup.tbankId" type="text" placeholder="Your TBank account ID" required />
         </div>
 
-        <!-- Salary split -->
+        <!-- Wallet split -->
         <p class="field-group-label">
-          Initial Salary Split
+          Initial Wallet Split
           <span :class="['split-sum', splitValid ? 'split-sum--ok' : 'split-sum--err']">
             {{ splitTotal }}% / 100%
           </span>
@@ -209,9 +177,10 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginUser, createUser, registerAccount } from '../api/users.js'
+import { useFinanceStore } from '../stores/finance.js'
 
 const router  = useRouter()
-const role    = ref('employee')
+const store   = useFinanceStore()
 const mode    = ref('login')
 const loading = ref(false)
 const error   = ref('')
@@ -258,16 +227,6 @@ async function handleLogin() {
   loading.value = true
   clearMessages()
   try {
-    if (role.value === 'employer') {
-      // Employer login — no API yet, keep mock
-      if (!login.value.username || !login.value.password) throw new Error('Enter credentials')
-      localStorage.setItem('token', 'mock-token-employer')
-      localStorage.setItem('role', 'employer')
-      router.push('/employer-portal')
-      return
-    }
-
-    // Employee login — POST /LoginUser
     const { data } = await loginUser({
       Username: login.value.username,
       Password: login.value.password,
@@ -298,6 +257,10 @@ async function handleLogin() {
 
     localStorage.setItem('token', 'authenticated')
     localStorage.setItem('role',  'employee')
+
+    // Re-hydrate the store with the new user's session data before navigating
+    store.initFromSession()
+
     router.push('/dashboard')
   } catch (err) {
     const msg = err.response?.data?.Errors?.[0] ?? err.message
@@ -338,7 +301,6 @@ async function handleSignup() {
     await createUser(payload)
 
     // Step 2 — Extract session variables
-    // Response returns { userId, username, tbankId, Message } — nric/fullName come from the form
     const sessionNric          = signup.value.nric
     const sessionAccountHolder = signup.value.fullName
     const customerId           = nextCustomerId()
@@ -348,14 +310,14 @@ async function handleSignup() {
     sessionStorage.setItem('customerId',        customerId)
     sessionStorage.setItem('accountHolderName', sessionAccountHolder)
 
-    // Step 4 — POST /RegisterAccount with the session variables
+    // Step 4 — POST /RegisterAccount
     await registerAccount({
       nric:              sessionNric,
       customerId,
       accountHolderName: sessionAccountHolder,
     })
 
-    // Step 5 — Success: reset form and redirect to sign-in
+    // Step 5 — Success
     success.value = `Account created for ${signup.value.fullName}. You can now sign in.`
     signup.value = {
       fullName: '', nric: '', email: '', phoneNumber: '',
@@ -414,40 +376,6 @@ async function handleSignup() {
   display: flex; align-items: center; justify-content: center;
 }
 .brand-name { font-size: 1rem; font-weight: 700; color: var(--text); }
-
-/* Role toggle */
-.role-toggle {
-  display: flex;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 4px;
-  gap: 4px;
-  margin-bottom: 1rem;
-}
-.role-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 7px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  background: transparent;
-  color: var(--text-3);
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.role-btn:hover { color: var(--text-2); }
-.role-btn--active {
-  background: var(--surface-3);
-  color: var(--teal);
-  border: 1px solid rgba(0,212,200,0.2);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
 
 /* Mode tabs */
 .mode-tabs {
@@ -601,16 +529,6 @@ input::placeholder { color: var(--text-3); }
   transition: color 0.2s;
 }
 .back-link:hover { color: var(--teal); }
-
-/* Hint */
-.hint {
-  margin-top: 1.25rem;
-  font-size: 0.72rem;
-  color: var(--text-3);
-  text-align: center;
-  border-top: 1px solid var(--border);
-  padding-top: 1rem;
-}
 
 /* Responsive */
 @media (max-width: 480px) {

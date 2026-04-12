@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { simulateSalaryCredit } from '../services/salaryService.js'
 import { getGoalProgress, optimizeSplit } from '../services/goalService.js'
 import { getDebitCardInfo } from '../services/accountService.js'
 import { getTransactionHistory, updateUserPercentage } from '../api/users.js'
@@ -24,7 +23,6 @@ export const useFinanceStore = defineStore('finance', () => {
   const user = ref({
     id:              sessionStorage.getItem('userId')  || 'user-001',
     name:            sessionName,
-    employer:        'Meridian Tech Pte Ltd',
     checkingAccount: '***-***-4821',
     avatarInitials:  getInitials(sessionName),
   })
@@ -32,13 +30,6 @@ export const useFinanceStore = defineStore('finance', () => {
   const balances = ref({ save: 12450.00, invest: 8200.00, spend: 3100.00 })
   const splitSettings  = ref({ save: sessionSave, invest: sessionInvest, spend: sessionSpend })
   const pendingSettings= ref({ save: sessionSave, invest: sessionInvest, spend: sessionSpend })
-
-  const salary = ref({
-    gross: 8500.00,
-    lastCreditDate: '2026-03-01',
-    lastCreditAmount: 8500.00,
-    nextCreditDate: '2026-04-01',
-  })
 
   const goals = ref([
     { id: 'goal-1', name: 'House Downpayment', target: 50000, current: 17000, deadline: 'Dec 2026', emoji: '🏠' },
@@ -77,7 +68,6 @@ export const useFinanceStore = defineStore('finance', () => {
   ])
 
   const isRefreshing        = ref(false)
-  const isCreditingRef      = ref(false)
   const isChatLoading       = ref(false)
   const settingsSaved       = ref(false)
   const isApplyingSplit     = ref(false)
@@ -111,6 +101,28 @@ export const useFinanceStore = defineStore('finance', () => {
   )
 
   // ── Actions ───────────────────────────────────────────────────
+  function initFromSession() {
+    const name   = sessionStorage.getItem('fullName') || 'Alex Tan Wei Ming'
+    const save   = parseFloat(sessionStorage.getItem('savePercentage'))   || 40
+    const invest = parseFloat(sessionStorage.getItem('investPercentage')) || 30
+    const spend  = parseFloat(sessionStorage.getItem('spendPercentage'))  || 30
+
+    user.value.id             = sessionStorage.getItem('userId') || 'user-001'
+    user.value.name           = name
+    user.value.avatarInitials = getInitials(name)
+    debitCard.value.cardholderName = name.toUpperCase()
+
+    splitSettings.value  = { save, invest, spend }
+    pendingSettings.value = { save, invest, spend }
+
+    chatMessages.value = [{
+      id:      'msg-0',
+      role:    'assistant',
+      content: `Hi ${name.split(' ')[0]} 👋 I'm your Financial Pilot AI. Ask me anything about optimising your Save, Invest, or Spend split — I'll run the numbers for your goals.`,
+      ts:      Date.now(),
+    }]
+  }
+
   async function refreshDashboard() {
     isRefreshing.value = true
     try {
@@ -134,48 +146,6 @@ export const useFinanceStore = defineStore('finance', () => {
       transactions.value = data
     } finally {
       isLoadingTransactions.value = false
-    }
-  }
-
-  async function simulateSalary() {
-    isCreditingRef.value = true
-    try {
-      const result = await simulateSalaryCredit({
-        employer: user.value.employer,
-        amount: salary.value.gross,
-        splitSettings: splitSettings.value,
-      })
-      // Update balances
-      balances.value.save   += result.split.save
-      balances.value.invest += result.split.invest
-      balances.value.spend  += result.split.spend
-
-      // Update goal progress proportionally
-      goals.value[0].current = Math.min(goals.value[0].current + result.split.save * 0.5, goals.value[0].target)
-
-      // Record last split event
-      lastSplitEvent.value = {
-        date:   result.creditedAt.split('T')[0],
-        gross:  result.grossAmount,
-        save:   result.split.save,
-        invest: result.split.invest,
-        spend:  result.split.spend,
-      }
-
-      salary.value.lastCreditDate   = result.creditedAt.split('T')[0]
-      salary.value.lastCreditAmount = result.grossAmount
-
-      // Add a transaction
-      transactions.value.unshift({
-        id:       'txn-sal-' + Date.now(),
-        date:     result.creditedAt.split('T')[0],
-        merchant: result.employer,
-        category: 'Salary',
-        amount:   +result.grossAmount,
-        status:   'settled',
-      })
-    } finally {
-      isCreditingRef.value = false
     }
   }
 
@@ -269,12 +239,12 @@ export const useFinanceStore = defineStore('finance', () => {
 
   return {
     user, balances, splitSettings, pendingSettings,
-    salary, goals, transactions, debitCard, chatMessages,
-    isRefreshing, isCreditingRef, isChatLoading, settingsSaved, isApplyingSplit, isLoadingTransactions,
+    goals, transactions, debitCard, chatMessages,
+    isRefreshing, isChatLoading, settingsSaved, isApplyingSplit, isLoadingTransactions,
     isUpdatingSplit, splitUpdateError,
     lastSplitEvent,
     totalBalance, primaryGoal, primaryGoalPct, spendLimitPct,
-    refreshDashboard, fetchTransactions, simulateSalary, approveSplitSettings, sendChat,
+    initFromSession, refreshDashboard, fetchTransactions, approveSplitSettings, sendChat,
     applySuggestedSplit,
   }
 })

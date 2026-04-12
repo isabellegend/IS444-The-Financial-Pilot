@@ -5,7 +5,102 @@
         <h1 class="page-title">Debit Card</h1>
         <p class="page-sub">Virtual Spend bucket card</p>
       </div>
+      <button class="btn btn-primary transfer-trigger" @click="showTransfer = true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+        Transfer
+      </button>
     </div>
+
+    <!-- Transfer modal -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showTransfer" class="modal-overlay" @click.self="closeTransfer">
+          <div class="modal-box">
+            <div class="modal-header">
+              <h3>Transfer Funds</h3>
+              <button class="modal-close" @click="closeTransfer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Success state -->
+            <div v-if="transferSuccess" class="transfer-success">
+              <div class="ts-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <p class="ts-title">Transfer Sent</p>
+              <p class="ts-sub">{{ transferSuccess }}</p>
+              <button class="btn btn-ghost ts-btn" @click="closeTransfer">Done</button>
+            </div>
+
+            <!-- Form -->
+            <template v-else>
+              <div class="modal-balance">
+                <span class="mb-label">Available (Spend)</span>
+                <span class="mb-val mono">S$ {{ fmt(store.balances.spend) }}</span>
+              </div>
+
+              <form @submit.prevent="submitTransfer">
+                <div class="m-field">
+                  <label>Recipient NRIC</label>
+                  <input
+                    v-model="transfer.recipientNric"
+                    type="text"
+                    placeholder="e.g. S1234567A"
+                    :disabled="isTransferring"
+                    required
+                  />
+                </div>
+                <div class="m-field">
+                  <label>Amount (S$)</label>
+                  <div class="amount-wrap">
+                    <span class="amount-prefix">S$</span>
+                    <input
+                      v-model.number="transfer.amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0.00"
+                      class="amount-input"
+                      :disabled="isTransferring"
+                      required
+                    />
+                  </div>
+                </div>
+                <div class="m-field">
+                  <label>Note <span class="optional">(optional)</span></label>
+                  <input
+                    v-model="transfer.note"
+                    type="text"
+                    placeholder="e.g. Dinner split"
+                    :disabled="isTransferring"
+                  />
+                </div>
+
+                <p v-if="transferError" class="t-error">{{ transferError }}</p>
+
+                <div class="modal-actions">
+                  <button type="submit" class="btn btn-primary" :disabled="isTransferring">
+                    <span v-if="isTransferring" class="btn-spinner" />
+                    {{ isTransferring ? 'Sending…' : 'Send Transfer' }}
+                  </button>
+                  <button type="button" class="btn btn-ghost" @click="closeTransfer" :disabled="isTransferring">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </template>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <div class="debit-layout">
       <!-- Left: Card + spending limit -->
@@ -153,12 +248,75 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useFinanceStore } from '../stores/finance.js'
+import { debitSpendAccount, creditSpendAccount } from '../api/users.js'
 
 const store = useFinanceStore()
 
 onMounted(() => store.fetchTransactions())
+
+// ── Transfer ──────────────────────────────────────────────────
+const showTransfer   = ref(false)
+const isTransferring = ref(false)
+const transferSuccess = ref('')
+const transferError  = ref('')
+
+const transfer = ref({ recipientNric: '', amount: '', note: '' })
+
+function closeTransfer() {
+  showTransfer.value   = false
+  transferSuccess.value = ''
+  transferError.value  = ''
+  transfer.value = { recipientNric: '', amount: '', note: '' }
+}
+
+async function submitTransfer() {
+  transferError.value = ''
+  const amt = Number(transfer.value.amount)
+  if (!amt || amt <= 0) { transferError.value = 'Enter a valid amount.'; return }
+  if (amt > store.balances.spend) { transferError.value = 'Insufficient funds in Spend bucket.'; return }
+
+  const payerNric    = sessionStorage.getItem('nric') || 'T9992445Z'
+  const recipientNric = transfer.value.recipientNric.trim().toUpperCase()
+  const narrative    = transfer.value.note.trim() || `Transfer to ${recipientNric}`
+  const referenceId  = 'REF' + Date.now()
+
+  isTransferring.value = true
+  try {
+    // Step 1 — Debit payer's Spend wallet
+    const { data: debitData } = await debitSpendAccount({
+      nric:        payerNric,
+      amount:      amt,
+      narrative,
+      referenceId,
+    })
+    console.log('[DebitSpendAccount] response:', JSON.stringify(debitData, null, 2))
+
+    // Step 2 — Credit recipient's Spend wallet
+    const { data: creditData } = await creditSpendAccount({
+      nric:        recipientNric,
+      amount:      amt,
+      narrative,
+      referenceId,
+    })
+    console.log('[CreditSpendAccount] response:', JSON.stringify(creditData, null, 2))
+
+    // Update local spend balance with what the server returned
+    store.balances.spend = debitData.balanceAfter
+
+    transferSuccess.value = `S$ ${amt.toFixed(2)} sent to ${recipientNric}. Your new Spend balance is S$ ${Number(debitData.balanceAfter).toFixed(2)}.`
+  } catch (err) {
+    console.error('[Transfer error]', err?.response?.data)
+    const msg = err?.response?.data?.Errors?.[0]
+      || err?.response?.data?.message
+      || err?.message
+      || 'Transfer failed. Please try again.'
+    transferError.value = msg
+  } finally {
+    isTransferring.value = false
+  }
+}
 
 const limitColor = computed(() => {
   if (store.spendLimitPct >= 90) return 'var(--danger)'
@@ -186,10 +344,193 @@ function fmt(n) {
 
 <style scoped>
 .debit-page   { max-width: 1000px; }
-.page-header  { margin-bottom: 2rem; }
+.page-header  {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
 .page-title   { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.2rem; }
 .page-sub     { color: var(--text-2); font-size: 0.875rem; }
 .label-sm     { font-size: 0.75rem; color: var(--text-3); }
+
+.transfer-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: 1rem;
+}
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 32px 64px rgba(0,0,0,0.5);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.modal-header h3 { font-size: 1.1rem; font-weight: 700; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  transition: all var(--tr);
+}
+.modal-close:hover { color: var(--text); background: var(--surface-2); }
+
+.modal-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.mb-label { font-size: 0.78rem; color: var(--text-3); }
+.mb-val   { font-size: 0.95rem; font-weight: 500; color: var(--teal); }
+
+.m-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+}
+.m-field label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+.optional { text-transform: none; font-weight: 400; color: var(--text-3); }
+.m-field input {
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  outline: none;
+  background: var(--surface-2);
+  color: var(--text);
+  transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.m-field input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+.m-field input::placeholder { color: var(--text-3); }
+.m-field input:disabled { opacity: 0.5; }
+
+.amount-wrap {
+  position: relative;
+}
+.amount-prefix {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.875rem;
+  color: var(--text-3);
+  pointer-events: none;
+  font-family: var(--font-mono);
+}
+.amount-input { padding-left: 2.2rem !important; }
+
+.t-error {
+  font-size: 0.8rem;
+  color: #f87171;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+.modal-actions .btn-primary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* Transfer success */
+.transfer-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0 0.5rem;
+  gap: 0.6rem;
+}
+.ts-icon {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--teal-dim);
+  border: 1px solid rgba(0,212,200,0.25);
+  color: var(--teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+.ts-title { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.ts-sub   { font-size: 0.85rem; color: var(--text-2); }
+.ts-btn   { margin-top: 0.5rem; }
+
+/* Spinner */
+.btn-spinner {
+  display: inline-block;
+  width: 13px; height: 13px;
+  border: 2px solid rgba(10,15,30,0.3);
+  border-top-color: #0A0F1E;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal transition */
+.modal-fade-enter-active, .modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-active .modal-box,
+.modal-fade-leave-active .modal-box {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-fade-enter-from { opacity: 0; }
+.modal-fade-enter-from .modal-box { transform: scale(0.95) translateY(8px); opacity: 0; }
+.modal-fade-leave-to { opacity: 0; }
 
 .debit-layout {
   display: grid;

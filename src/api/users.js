@@ -42,3 +42,11 @@ export function updateUserPercentage({ nric, savePercentage, investPercentage, s
     { params: { NRIC: nric } }
   )
 }
+
+export function debitSpendAccount(payload) {
+  return checkingApi.put('/DebitSpendAccount', payload)
+}
+
+export function creditSpendAccount(payload) {
+  return checkingApi.put('/CreditSpendAccount', payload)
+}
