@@ -2,5 +2,7 @@
 // Usage: import { auth } from '@/api'
 export { default as auth } from './auth.js'
 export * as users from './users.js'
+export * as dashboard from './dashboard.js'
+export * as chatbot from './chatbot.js'
 // export { default as products } from './products.js'
 // export { default as orders }   from './orders.js'

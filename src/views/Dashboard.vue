@@ -107,10 +107,13 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import { useFinanceStore } from '../stores/finance.js'
 import BucketCard from '../components/BucketCard.vue'
 
 const store = useFinanceStore()
+
+onMounted(() => store.refreshDashboard())
 
 const buckets = [
   { key: 'save',   label: 'Save',   color: '#00D4C8', dim: 'rgba(0,212,200,0.1)',   glow: 'rgba(0,212,200,0.2)'  },

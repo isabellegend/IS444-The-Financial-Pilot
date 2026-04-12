@@ -288,7 +288,7 @@ async function handleSignup() {
   clearMessages()
   try {
     // Step 1 — POST /Users to create the user record
-    const { data: userData } = await createUser({
+    const payload = {
       fullName:         signup.value.fullName,
       nric:             signup.value.nric,
       email:            signup.value.email,
@@ -300,11 +300,14 @@ async function handleSignup() {
       savePercentage:   signup.value.savePercentage,
       investPercentage: signup.value.investPercentage,
       spendPercentage:  signup.value.spendPercentage,
-    })
+    }
+    console.log('[POST /Users] payload:', JSON.stringify(payload, null, 2))
+    await createUser(payload)
 
-    // Step 2 — Extract session variables from the response
-    const sessionNric          = userData.nric             ?? signup.value.nric
-    const sessionAccountHolder = userData.fullName         ?? signup.value.fullName
+    // Step 2 — Extract session variables
+    // Response returns { userId, username, tbankId, Message } — nric/fullName come from the form
+    const sessionNric          = signup.value.nric
+    const sessionAccountHolder = signup.value.fullName
     const customerId           = nextCustomerId()
 
     // Step 3 — Persist to sessionStorage
@@ -328,7 +331,13 @@ async function handleSignup() {
     }
     setTimeout(() => { mode.value = 'login'; success.value = '' }, 2000)
   } catch (err) {
-    const msg = err.response?.data?.message ?? err.response?.data?.errors?.[0] ?? err.message
+    console.error('[Registration error] status:', err.response?.status)
+    console.error('[Registration error] body:', JSON.stringify(err.response?.data, null, 2))
+    const msg = err.response?.data?.Errors?.[0]
+      ?? err.response?.data?.errors?.[0]
+      ?? err.response?.data?.message
+      ?? err.response?.data?.Message
+      ?? err.message
     error.value = msg || 'Registration failed. Please try again.'
   } finally {
     loading.value = false

@@ -32,9 +32,11 @@
               </div>
               <button
                 class="btn btn-outline apply-btn"
+                :disabled="store.isApplyingSplit"
                 @click="store.applySuggestedSplit(msg.suggestedSplit)"
               >
-                Apply this split →
+                <span v-if="store.isApplyingSplit" class="apply-spinner" />
+                <span v-else>Apply this split →</span>
               </button>
             </div>
             <span class="bubble-ts">{{ fmtTime(msg.ts) }}</span>
@@ -267,7 +269,16 @@ function fmtTime(ts) {
 .split-chip.save   { color: #00D4C8; border-color: rgba(0,212,200,0.3); background: rgba(0,212,200,0.1); }
 .split-chip.invest { color: #F5C842; border-color: rgba(245,200,66,0.3); background: rgba(245,200,66,0.1); }
 .split-chip.spend  { color: #A855F7; border-color: rgba(168,85,247,0.3); background: rgba(168,85,247,0.1); }
-.apply-btn { font-size: 0.78rem; padding: 0.4rem 0.9rem; }
+.apply-btn { font-size: 0.78rem; padding: 0.4rem 0.9rem; min-width: 130px; justify-content: center; }
+.apply-spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid rgba(0,212,200,0.3);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Typing dots */
 .typing-dots {

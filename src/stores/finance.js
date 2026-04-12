@@ -2,7 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { simulateSalaryCredit } from '../services/salaryService.js'
 import { getGoalProgress, optimizeSplit } from '../services/goalService.js'
-import { getBalances, getTransactions, getDebitCardInfo } from '../services/accountService.js'
+import { getTransactions, getDebitCardInfo } from '../services/accountService.js'
+import { getDashboardMetrics } from '../api/dashboard.js'
+import { updateSplit } from '../api/chatbot.js'
 
 export const useFinanceStore = defineStore('finance', () => {
   // ── State ──────────────────────────────────────────────────────
@@ -61,10 +63,11 @@ export const useFinanceStore = defineStore('finance', () => {
     },
   ])
 
-  const isRefreshing   = ref(false)
-  const isCreditingRef = ref(false)
-  const isChatLoading  = ref(false)
-  const settingsSaved  = ref(false)
+  const isRefreshing    = ref(false)
+  const isCreditingRef  = ref(false)
+  const isChatLoading   = ref(false)
+  const settingsSaved   = ref(false)
+  const isApplyingSplit = ref(false)
 
   // Last split event (for dashboard summary)
   const lastSplitEvent = ref({
@@ -95,11 +98,13 @@ export const useFinanceStore = defineStore('finance', () => {
   async function refreshDashboard() {
     isRefreshing.value = true
     try {
-      const [b] = await Promise.all([
-        getBalances(user.value.id),
-        getGoalProgress(user.value.id),
-      ])
-      balances.value = { save: b.save, invest: b.invest, spend: b.spend }
+      const nric = 'T9992445Z'
+      const { data } = await getDashboardMetrics(nric)
+      balances.value = {
+        save:   parseFloat(data.DepositBalance),
+        invest: data.totalPortfolioSizeInBaseCurrency,
+        spend:  parseFloat(data.SpendWalletBalance),
+      }
     } finally {
       isRefreshing.value = false
     }
@@ -177,15 +182,41 @@ export const useFinanceStore = defineStore('finance', () => {
     }
   }
 
-  function applySuggestedSplit(split) {
+  async function applySuggestedSplit(split) {
     pendingSettings.value = { ...split }
     splitSettings.value   = { ...split }
+
+    isApplyingSplit.value = true
+    try {
+      const nric = 'T9992445Z'
+      const { data } = await updateSplit({
+        savePercentage:   split.save,
+        investPercentage: split.invest,
+        spendPercentage:  split.spend,
+        nric,
+      })
+      chatMessages.value.push({
+        id:      'msg-apply-' + Date.now(),
+        role:    'assistant',
+        content: data.Message || 'Your split has been updated successfully.',
+        ts:      Date.now(),
+      })
+    } catch {
+      chatMessages.value.push({
+        id:      'msg-apply-err-' + Date.now(),
+        role:    'assistant',
+        content: 'Split saved locally, but we could not notify the server. Please try again.',
+        ts:      Date.now(),
+      })
+    } finally {
+      isApplyingSplit.value = false
+    }
   }
 
   return {
     user, balances, splitSettings, pendingSettings,
     salary, goals, transactions, debitCard, chatMessages,
-    isRefreshing, isCreditingRef, isChatLoading, settingsSaved,
+    isRefreshing, isCreditingRef, isChatLoading, settingsSaved, isApplyingSplit,
     lastSplitEvent,
     totalBalance, primaryGoal, primaryGoalPct, spendLimitPct,
     refreshDashboard, simulateSalary, approveSplitSettings, sendChat,
