@@ -30,6 +30,46 @@ export function loginUser(payload) {
   return userApi.post('/LoginUser', payload)
 }
 
+/**
+ * Store session variables from LoginUser response
+ * Extracts NRIC, name, customer type, and split percentages
+ * @param {Object} loginResponse - Response from LoginUser endpoint
+ */
+export function storeSessionVariables(loginResponse) {
+  const data = loginResponse.data || loginResponse
+  
+  // Extract and store session variables
+  if (data.userNRIC || data.nric) {
+    sessionStorage.setItem('nric', data.userNRIC || data.nric)
+  }
+  if (data.fullName || data.name) {
+    sessionStorage.setItem('fullName', data.fullName || data.name)
+  }
+  if (data.customerType) {
+    sessionStorage.setItem('customerType', data.customerType)
+  }
+  if (data.savePercentage) {
+    sessionStorage.setItem('savePercentage', data.savePercentage)
+  }
+  if (data.investPercentage) {
+    sessionStorage.setItem('investPercentage', data.investPercentage)
+  }
+  if (data.spendPercentage) {
+    sessionStorage.setItem('spendPercentage', data.spendPercentage)
+  }
+  if (data.checkingAccount) {
+    sessionStorage.setItem('checkingAccount', data.checkingAccount)
+  }
+  if (data.saveAccount) {
+    sessionStorage.setItem('saveAccount', data.saveAccount)
+  }
+  if (data.investAccount) {
+    sessionStorage.setItem('investAccount', data.investAccount)
+  }
+  
+  return data
+}
+
 export function registerAccount(payload) {
   return checkingApi.post('/RegisterAccount', payload)
 }

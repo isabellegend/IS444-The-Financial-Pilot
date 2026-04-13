@@ -208,7 +208,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { loginUser, createUser, registerAccount } from '../api/users.js'
+import { loginUser, storeSessionVariables, createUser, registerAccount } from '../api/users.js'
 import { useFinanceStore } from '../stores/finance.js'
 
 const router  = useRouter()
@@ -277,17 +277,10 @@ async function handleLogin() {
       throw new Error(`This account is a ${actual} account. Please use the ${actual} login tab.`)
     }
 
-    // Store session variables
+    // Store session variables from LoginUser response
+    storeSessionVariables(data)
+    
     const ctype = returnedType || customerType.value
-    sessionStorage.setItem('nric',            data.NRIC)
-    sessionStorage.setItem('userId',          data.Id)
-    sessionStorage.setItem('fullName',        data.FullName)
-    sessionStorage.setItem('email',           data.Email)
-    sessionStorage.setItem('savePercentage',  data.SavePercentage)
-    sessionStorage.setItem('investPercentage',data.InvestPercentage)
-    sessionStorage.setItem('spendPercentage', data.SpendPercentage)
-    sessionStorage.setItem('customerType',    ctype)
-
     localStorage.setItem('token',        'authenticated')
     localStorage.setItem('role',         'employee')
     localStorage.setItem('customerType', ctype)

@@ -279,9 +279,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useCorporateStore } from '../stores/corporate.js'
+import { useFinanceStore } from '../stores/finance.js'
 import { debitSpendAccount, creditSpendAccount } from '../api/users.js'
 
 const store     = useCorporateStore()
+const financeStore = useFinanceStore()
 const activeTab = ref('all')
 
 onMounted(() => {

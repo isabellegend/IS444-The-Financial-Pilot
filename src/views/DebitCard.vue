@@ -250,7 +250,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useFinanceStore } from '../stores/finance.js'
-import { debitSpendAccount, creditSpendAccount } from '../api/users.js'
+import { executeSalarySplitter } from '../api/salarySplitter.js'
 
 const store = useFinanceStore()
 
@@ -277,37 +277,37 @@ async function submitTransfer() {
   if (!amt || amt <= 0) { transferError.value = 'Enter a valid amount.'; return }
   if (amt > store.balances.spend) { transferError.value = 'Insufficient funds in Spend bucket.'; return }
 
-  const payerNric    = sessionStorage.getItem('nric') || 'T9992445Z'
+  // Get payer NRIC from session (set during LoginUser)
+  const payerNric = sessionStorage.getItem('nric')
+  if (!payerNric) { transferError.value = 'Session expired. Please log in again.'; return }
+
   const recipientNric = transfer.value.recipientNric.trim().toUpperCase()
   const narrative    = transfer.value.note.trim() || `Transfer to ${recipientNric}`
   const referenceId  = 'REF' + Date.now()
 
   isTransferring.value = true
   try {
-    // Step 1 — Debit payer's Spend wallet
-    const { data: debitData } = await debitSpendAccount({
-      nric:        payerNric,
-      amount:      amt,
+    // Execute salary splitter transfer (corporate account - no auth required)
+    // This flow: GetRecipientByNRIC -> PutDebitSpendAccount -> PutCreditSpendAccount -> DepositCash -> Recipient dashboard updates
+    const { data: response } = await executeSalarySplitter({
+      payerNric,
+      recipientNric,
+      amount: amt,
       narrative,
       referenceId,
     })
-    console.log('[DebitSpendAccount] response:', JSON.stringify(debitData, null, 2))
+    console.log('[ExecuteSalarySplitter] response:', JSON.stringify(response, null, 2))
 
-    // Step 2 — Credit recipient's Spend wallet
-    const { data: creditData } = await creditSpendAccount({
-      nric:        recipientNric,
-      amount:      amt,
-      narrative,
-      referenceId,
-    })
-    console.log('[CreditSpendAccount] response:', JSON.stringify(creditData, null, 2))
+    // Update local spend balance if returned in response
+    if (response.payerBalanceAfter !== undefined) {
+      store.balances.spend = response.payerBalanceAfter
+    }
 
-    // Update local spend balance with what the server returned
-    store.balances.spend = debitData.balanceAfter
-
-    transferSuccess.value = `S$ ${amt.toFixed(2)} sent to ${recipientNric}. Your new Spend balance is S$ ${Number(debitData.balanceAfter).toFixed(2)}.`
+    // Success message - recipient will see update on their dashboard via OutSystems
+    const balanceText = store.balances.spend ? ` Your new Spend balance is S$ ${Number(store.balances.spend).toFixed(2)}.` : ''
+    transferSuccess.value = `S$ ${amt.toFixed(2)} sent to ${recipientNric}.${balanceText} Recipient will see the credit on their dashboard.`
   } catch (err) {
-    console.error('[Transfer error]', err?.response?.data)
+    console.error('[ExecuteSalarySplitter error]', err?.response?.data || err?.message)
     const msg = err?.response?.data?.Errors?.[0]
       || err?.response?.data?.message
       || err?.message
