@@ -18,7 +18,7 @@ const routes = [
       { path: 'dashboard',          name: 'Dashboard',       component: () => import('./views/Dashboard.vue')         },
       { path: 'profile',            name: 'Profile',         component: () => import('./views/Profile.vue')           },
       { path: 'goal-optimisation',  name: 'GoalOptimisation',component: () => import('./views/GoalOptimisation.vue')  },
-      { path: 'debit-card',         name: 'DebitCard',       component: () => import('./views/DebitCard.vue')         },
+      { path: 'virtual-wallet',     name: 'VirtualWallet',   component: () => import('./views/VirtualWallet.vue')     },
     ],
   },
 

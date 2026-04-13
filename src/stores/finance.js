@@ -13,6 +13,14 @@ export const useFinanceStore = defineStore('finance', () => {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
   }
 
+  const EMOJI_MAP = {
+    'HDB BTO Downpayment': '🏠',
+    'Car':                 '🚗',
+    'Vacation':            '✈️',
+    'Emergency Fund':      '🛡️',
+    'Education':           '🎓',
+  }
+
   const sessionName  = sessionStorage.getItem('fullName') || 'Alex Tan Wei Ming'
   const sessionSave  = parseFloat(sessionStorage.getItem('savePercentage'))  || 40
   const sessionInvest= parseFloat(sessionStorage.getItem('investPercentage'))|| 30
@@ -39,6 +47,11 @@ export const useFinanceStore = defineStore('finance', () => {
   ])
 
   const transactions = ref([])
+  const salaryAmount = ref(0)
+  const savePct      = ref(40)
+  const investPct    = ref(30)
+  const spendPct     = ref(30)
+  const updatedAt    = ref('')
 
   const debitCard = ref({
     cardNumber: '**** **** **** 4821',
@@ -46,7 +59,6 @@ export const useFinanceStore = defineStore('finance', () => {
     expiry: '03/29',
     network: 'VISA',
     spendLimit: 2000.00,
-    spentThisMonth: 447.16,
   })
 
   const chatMessages = ref([
@@ -66,13 +78,21 @@ export const useFinanceStore = defineStore('finance', () => {
   const isUpdatingSplit     = ref(false)
   const splitUpdateError    = ref('')
 
-  // Last split event (for dashboard summary)
-  const lastSplitEvent = ref({
-    date: '2026-03-01',
-    gross: 8500,
-    save:  3400,
-    invest: 2550,
-    spend:  2550,
+  // Last split event (calculated from salary session)
+  const lastSplitEvent = computed(() => {
+    const gross = salaryAmount.value || 8500
+    // Defensive check: only slice if it looks like an ISO date (YYYY-MM-DD or longer)
+    const rawDate = updatedAt.value
+    const dateStr = (rawDate && rawDate.length >= 10 && !rawDate.includes(' ')) 
+      ? rawDate.slice(0, 10) 
+      : '2026-03-01'
+    return {
+      date:   dateStr,
+      gross:  gross,
+      save:   gross * (savePct.value / 100),
+      invest: gross * (investPct.value / 100),
+      spend:  gross * (spendPct.value / 100),
+    }
   })
 
   // ── Computed ──────────────────────────────────────────────────
@@ -80,18 +100,115 @@ export const useFinanceStore = defineStore('finance', () => {
     balances.value.save + balances.value.invest + balances.value.spend
   )
 
-  const primaryGoal = computed(() => goals.value[0])
+  const primaryGoal = computed(() => {
+    const g = goals.value[0]
+    if (!g) return null
+    return {
+      ...g,
+      current: balances.value.save
+    }
+  })
 
   const primaryGoalPct = computed(() => {
     const g = primaryGoal.value
+    if (!g) return 0
     return Math.min(Math.round((g.current / g.target) * 100), 100)
   })
 
+  const CAT_META = {
+    Food:      { icon: '🍜', color: '#F87171' },
+    Groceries: { icon: '🛒', color: '#34D399' },
+    Entertain: { icon: '🎬', color: '#818CF8' },
+    Shopping:  { icon: '🛍️', color: '#F59E0B' },
+    Transport: { icon: '🚗', color: '#38BDF8' },
+    Sports:    { icon: '🏃', color: '#A3E635' },
+    Salary:    { icon: '💰', color: '#00D4C8' },
+  }
+
+  const spentThisMonth = computed(() => {
+    return transactions.value
+      .filter(t => t.amount < 0)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+  })
+
+  const categoryBreakdown = computed(() => {
+    const breakdown = {}
+    Object.keys(CAT_META).forEach(cat => { breakdown[cat] = 0 })
+
+    transactions.value.forEach(txn => {
+      if (txn.amount < 0) {
+        const cat = txn.category || 'Other'
+        if (!breakdown[cat]) breakdown[cat] = 0
+        breakdown[cat] += Math.abs(txn.amount)
+      }
+    })
+
+    const totalSpent = Object.values(breakdown).reduce((a, b) => a + b, 0) || 1
+    return Object.entries(breakdown)
+      .filter(([_, amt]) => amt > 0)
+      .map(([name, amount]) => ({
+        name,
+        amount,
+        icon: CAT_META[name]?.icon || '❓',
+        color: CAT_META[name]?.color || 'var(--text-3)',
+        pct: Math.round((amount / totalSpent) * 100)
+      }))
+      .sort((a,b) => b.amount - a.amount)
+  })
+
   const spendLimitPct = computed(() =>
-    Math.min(Math.round((debitCard.value.spentThisMonth / debitCard.value.spendLimit) * 100), 100)
+    Math.min(Math.round((spentThisMonth.value / debitCard.value.spendLimit) * 100), 100)
   )
 
   // ── Actions ───────────────────────────────────────────────────
+  function syncGoalFromSession() {
+    const nric = sessionStorage.getItem('nric') || 'anonymous'
+    const activeKey = `fp_active_goal_${nric}`
+    const sessionKey = `fp_goal_${nric}`
+    
+    const activeSaved = localStorage.getItem(activeKey)
+    const sessionSaved = localStorage.getItem(sessionKey)
+    
+    const saved = activeSaved || sessionSaved
+    if (!saved) return
+
+    try {
+      const s = JSON.parse(saved)
+      const goal = s.goalSummary || s
+      if (!goal || !goal.type) return
+
+      const { type, target, months, salaryAmount: sAmt, savePct: saPct, investPct: iPct, spendPct: spPct, updatedAt: uAt } = goal
+      
+      if (sAmt)    salaryAmount.value = sAmt
+      if (saPct)   savePct.value      = saPct
+      if (iPct)    investPct.value    = iPct
+      if (spPct)   spendPct.value     = spPct
+      if (uAt)     updatedAt.value    = uAt
+
+      // Update splitSettings synchronously to match most recent session
+      if (saPct && iPct && spPct) {
+        splitSettings.value = { save: saPct, invest: iPct, spend: spPct }
+        pendingSettings.value = { save: saPct, invest: iPct, spend: spPct }
+      }
+
+      // Calculate deadline date
+      const d = new Date()
+      d.setMonth(d.getMonth() + (months || 0))
+      const deadline = d.toLocaleDateString('en-SG', { month: 'short', year: 'numeric' })
+
+      // Update basic details in first goal
+      goals.value[0] = {
+        ...goals.value[0],
+        name:     type,
+        target:   target || 50000,
+        deadline: deadline,
+        emoji:    EMOJI_MAP[type] || '💰',
+      }
+    } catch (e) {
+      console.warn('[FinanceStore] Failed to sync goal from session', e)
+    }
+  }
+
   function initFromSession() {
     const name   = sessionStorage.getItem('fullName') || 'Alex Tan Wei Ming'
     const save   = parseFloat(sessionStorage.getItem('savePercentage'))   || 40
@@ -107,9 +224,10 @@ export const useFinanceStore = defineStore('finance', () => {
     splitSettings.value  = { save, invest, spend }
     pendingSettings.value = { save, invest, spend }
 
-    // Clear previous user's balances and transactions so stale data never shows
     balances.value      = { save: 0, invest: 0, spend: 0 }
     transactions.value  = []
+
+    syncGoalFromSession()
 
     chatMessages.value = [{
       id:      'msg-0',
@@ -122,6 +240,7 @@ export const useFinanceStore = defineStore('finance', () => {
   async function refreshDashboard() {
     isRefreshing.value = true
     try {
+      syncGoalFromSession()
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       const { data } = await getDashboardMetrics(nric)
       balances.value = {
@@ -140,16 +259,26 @@ export const useFinanceStore = defineStore('finance', () => {
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       const { data } = await getTransactionHistory(nric)
       const rawList = Array.isArray(data) ? data : (data?.List ?? data?.Transactions ?? [])
-      transactions.value = rawList.map(t => ({
-        id:           t.transactionId,
-        date:         t.transactionDate ? t.transactionDate.slice(0, 10) : '',
-        merchant:     t.narrative || '—',
-        type:         t.transactionType,           // 'DEBIT' | 'CREDIT'
-        amount:       t.transactionType === 'DEBIT' ? -Number(t.amount) : Number(t.amount),
-        balanceAfter: Number(t.balanceAfter),
-        referenceId:  t.referenceId || '',
-        status:       'settled',
-      }))
+      transactions.value = rawList.map(t => {
+        const rawNarrative = t.narrative || '—'
+        // Extract category from [Category] prefix
+        const catMatch = rawNarrative.match(/^\[(.*?)\]/)
+        const category = catMatch ? catMatch[1] : (t.category || t.Category || '')
+        // Remove the prefix from the displayed merchant name
+        const merchant = catMatch ? rawNarrative.replace(/^\[.*?\]\s?/, '') : rawNarrative
+
+        return {
+          id:           t.transactionId,
+          date:         t.transactionDate ? t.transactionDate.slice(0, 10) : '',
+          merchant,
+          category,
+          type:         t.transactionType,           // 'DEBIT' | 'CREDIT'
+          amount:       t.transactionType === 'DEBIT' ? -Number(t.amount) : Number(t.amount),
+          balanceAfter: Number(t.balanceAfter),
+          referenceId:  t.referenceId || '',
+          status:       'settled',
+        }
+      })
     } finally {
       isLoadingTransactions.value = false
     }
@@ -248,8 +377,9 @@ export const useFinanceStore = defineStore('finance', () => {
     goals, transactions, debitCard, chatMessages,
     isRefreshing, isChatLoading, settingsSaved, isApplyingSplit, isLoadingTransactions,
     isUpdatingSplit, splitUpdateError,
-    lastSplitEvent,
+    lastSplitEvent, CAT_META, categoryBreakdown,
     totalBalance, primaryGoal, primaryGoalPct, spendLimitPct,
+    salaryAmount, savePct, investPct, spendPct, updatedAt, spentThisMonth,
     initFromSession, refreshDashboard, fetchTransactions, approveSplitSettings, sendChat,
     applySuggestedSplit,
   }

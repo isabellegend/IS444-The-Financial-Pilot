@@ -45,7 +45,7 @@
         <div class="card-head-row">
           <div>
             <h3>Wallet Allocation</h3>
-            <p class="label-sm">Last credited {{ store.lastSplitEvent.date }}</p>
+            <p class="label-sm">Last Updated on {{ store.lastSplitEvent.date }}</p>
           </div>
           <span class="gross-badge mono">S$ {{ fmt(store.lastSplitEvent.gross) }}</span>
         </div>
@@ -68,12 +68,12 @@
                 class="donut-seg"
               />
               <!-- Center labels -->
-              <text x="50" y="47" text-anchor="middle" font-size="7.5"
-                font-family="system-ui, sans-serif" fill="currentColor" class="donut-label-sm">Total</text>
-              <text x="50" y="61" text-anchor="middle" font-size="11"
-                font-family="'Courier New', monospace" font-weight="600" fill="currentColor" class="donut-label-val">
-                {{ store.totalBalance >= 1000 ? (store.totalBalance / 1000).toFixed(1) + 'k' : fmt(store.totalBalance) }}
+              <text x="50" y="47" text-anchor="middle" font-size="13"
+                font-family="'Courier New', monospace" font-weight="700" fill="currentColor" class="donut-label-val">
+                {{ store.salaryAmount >= 1000 ? (store.salaryAmount / 1000).toFixed(1) + 'k' : fmt(store.salaryAmount) || '0.00' }}
               </text>
+              <text x="50" y="61" text-anchor="middle" font-size="7.5"
+                font-family="system-ui, sans-serif" fill="currentColor" class="donut-label-sm">Total</text>
             </svg>
           </div>
 
@@ -147,26 +147,18 @@
             </div>
             <div class="goal-amount-row">
               <span class="goal-amount-label">Remaining</span>
-              <span class="mono goal-amount-val danger">
-                S$ {{ fmtK(store.primaryGoal.target - store.primaryGoal.current) }}
+              <span 
+                class="mono goal-amount-val" 
+                :class="store.primaryGoal.current >= store.primaryGoal.target ? 'success' : 'danger'"
+              >
+                S$ {{ store.primaryGoal.current >= store.primaryGoal.target 
+                  ? fmt(store.primaryGoal.current - store.primaryGoal.target) 
+                  : fmt(store.primaryGoal.target - store.primaryGoal.current) }}
               </span>
             </div>
           </div>
         </div>
 
-        <!-- Second goal mini -->
-        <div v-if="store.goals[1]" class="mini-goal">
-          <span>{{ store.goals[1].emoji }} {{ store.goals[1].name }}</span>
-          <div class="mini-goal-bar">
-            <div
-              class="mini-goal-fill"
-              :style="{ width: Math.round((store.goals[1].current / store.goals[1].target) * 100) + '%' }"
-            />
-          </div>
-          <span class="mono mini-goal-pct">
-            {{ Math.round((store.goals[1].current / store.goals[1].target) * 100) }}%
-          </span>
-        </div>
       </div>
     </div>
 
@@ -183,17 +175,17 @@
           No debit transactions yet
         </div>
         <div v-else class="cat-list">
-          <div v-for="(cat, i) in spendByCategory" :key="cat.cat" class="cat-row">
+          <div v-for="cat in spendByCategory" :key="cat.cat" class="cat-row">
             <div class="cat-row__head">
-              <span class="cat-dot" :style="{ background: spendColor(i) }" />
+              <span class="cat-icon" style="font-size: 1rem; margin-right: 0.5rem;">{{ cat.icon }}</span>
               <span class="cat-name">{{ cat.cat }}</span>
-              <span class="cat-pct mono" :style="{ color: spendColor(i) }">{{ cat.pct }}%</span>
+              <span class="cat-pct mono" :style="{ color: cat.color }">{{ cat.pct }}%</span>
               <span class="cat-amt mono">S$ {{ fmt(cat.amt) }}</span>
             </div>
             <div class="cat-bar-track">
               <div
                 class="cat-bar-fill"
-                :style="{ width: cat.pct + '%', background: spendColor(i) }"
+                :style="{ width: cat.pct + '%', background: cat.color }"
               />
             </div>
           </div>
@@ -211,8 +203,20 @@
         <div v-if="recentTxns.length === 0" class="cat-empty">No transactions yet</div>
         <div v-else class="txn-list">
           <div v-for="txn in recentTxns" :key="txn.id" class="txn-row">
-            <div class="txn-icon" :class="txn.amount < 0 ? 'txn-icon--debit' : 'txn-icon--credit'">
-              <svg v-if="txn.amount < 0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <div class="txn-icon"
+              :style="txn.amount < 0 && store.CAT_META[txn.category] ? {
+                backgroundColor: store.CAT_META[txn.category].color + '1a',
+                color: store.CAT_META[txn.category].color
+              } : {}"
+              :class="{
+                'txn-icon--debit': txn.amount < 0 && !store.CAT_META[txn.category],
+                'txn-icon--credit': txn.amount > 0
+              }"
+            >
+              <template v-if="txn.amount < 0 && store.CAT_META[txn.category]">
+                <span style="font-size: 1rem">{{ store.CAT_META[txn.category].icon }}</span>
+              </template>
+              <svg v-else-if="txn.amount < 0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
               </svg>
               <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -290,23 +294,16 @@ const goalArcLength = computed(() =>
   (store.primaryGoalPct / 100) * GOAL_CIRCUMFERENCE
 )
 
-// ── Spending breakdown (grouped by merchant/narrative) ───────────
-const SPEND_PALETTE = ['#00D4C8', '#F5C842', '#A855F7', '#F97316', '#3B82F6']
-function spendColor(idx) { return SPEND_PALETTE[idx % SPEND_PALETTE.length] }
-
+// ── Spending breakdown (grouped by category) ───────────────────
 const spendByCategory = computed(() => {
-  const groups = {}
-  store.transactions.forEach(t => {
-    if (t.amount < 0) {
-      const label = (t.merchant || '—').trim()
-      groups[label] = (groups[label] || 0) + Math.abs(t.amount)
-    }
-  })
-  const total = Object.values(groups).reduce((a, b) => a + b, 0) || 1
-  return Object.entries(groups)
-    .map(([cat, amt]) => ({ cat, amt, pct: Math.round((amt / total) * 100) }))
-    .sort((a, b) => b.amt - a.amt)
-    .slice(0, 5)
+  const total = store.categoryBreakdown.reduce((a, b) => a + b.amount, 0) || 1
+  return store.categoryBreakdown.map(cat => ({
+    cat: cat.name,
+    amt: cat.amount,
+    pct: cat.pct,
+    color: cat.color,
+    icon: cat.icon
+  }))
 })
 
 const recentTxns = computed(() => store.transactions.slice(0, 5))
@@ -494,6 +491,7 @@ function fmtK(n) {
 .goal-amount-val   { font-size: 0.85rem; color: var(--text); }
 .goal-amount-val.dimmed { color: var(--text-2); }
 .goal-amount-val.danger { color: var(--danger); }
+.goal-amount-val.success { color: var(--success); }
 
 .mini-goal {
   display: flex;

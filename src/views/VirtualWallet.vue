@@ -1,9 +1,9 @@
 <template>
-  <div class="debit-page">
+  <div class="wallet-page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Debit Card</h1>
-        <p class="page-sub">Virtual Spend bucket card</p>
+        <h1 class="page-title">Virtual Wallet</h1>
+        <p class="page-sub">Track how much you spend and receive</p>
       </div>
       <button class="btn btn-primary transfer-trigger" @click="showTransfer = true">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -74,6 +74,16 @@
                     />
                   </div>
                 </div>
+
+                <div class="m-field">
+                  <label>Category</label>
+                  <select v-model="transfer.category" :disabled="isTransferring" required>
+                    <option v-for="(meta, name) in store.CAT_META" :key="name" :value="name">
+                      {{ name }}
+                    </option>
+                  </select>
+                </div>
+
                 <div class="m-field">
                   <label>Note <span class="optional">(optional)</span></label>
                   <input
@@ -102,7 +112,7 @@
       </Transition>
     </Teleport>
 
-    <div class="debit-layout">
+    <div class="wallet-layout">
       <!-- Left: Card + spending limit -->
       <div class="left-col">
         <!-- Virtual card -->
@@ -123,7 +133,7 @@
 
           <div class="vc__bottom">
             <div class="vc__holder">
-              <span class="vc__field-label">Card Holder</span>
+              <span class="vc__field-label">Wallet Holder</span>
               <span class="vc__field-val mono">{{ store.debitCard.cardholderName }}</span>
             </div>
             <div class="vc__expiry">
@@ -145,7 +155,7 @@
           </div>
           <div class="sl__amounts">
             <span class="mono sl__spent" :style="{ color: limitColor }">
-              S$ {{ fmt(store.debitCard.spentThisMonth) }}
+              S$ {{ fmt(store.spentThisMonth) }}
             </span>
             <span class="sl__sep">/</span>
             <span class="mono sl__limit">S$ {{ fmt(store.debitCard.spendLimit) }}</span>
@@ -157,22 +167,27 @@
             />
           </div>
           <p class="sl__remaining label-sm">
-            S$ {{ fmt(store.debitCard.spendLimit - store.debitCard.spentThisMonth) }} remaining this month
+            S$ {{ fmt(store.debitCard.spendLimit - store.spentThisMonth) }} remaining this month
           </p>
 
-          <!-- Debit / Credit summary -->
+          <!-- Wallet Summary -->
           <div class="category-breakdown">
-            <div class="cat-row">
-              <span class="cat-icon">⬇️</span>
-              <span class="cat-label">Debited</span>
+            <div v-for="cat in store.categoryBreakdown" :key="cat.name" class="cat-row">
+              <span class="cat-icon">{{ cat.icon }}</span>
+              <span class="cat-label">{{ cat.name }}</span>
               <div class="cat-bar-track">
-                <div class="cat-bar-fill cat-bar-fill--debit"
-                  :style="{ width: txnSummary.total ? (txnSummary.debit / txnSummary.total * 100) + '%' : '0%' }"
+                <div class="cat-bar-fill"
+                  :style="{
+                    width: cat.pct + '%',
+                    background: cat.color
+                  }"
                 />
               </div>
-              <span class="mono cat-amount">S$ {{ fmt(txnSummary.debit) }}</span>
+              <span class="mono cat-amount">S$ {{ fmt(cat.amount) }}</span>
             </div>
-            <div class="cat-row">
+
+            <!-- Total Credited (Income) -->
+            <div class="cat-row cat-row--credited">
               <span class="cat-icon">⬆️</span>
               <span class="cat-label">Credited</span>
               <div class="cat-bar-track">
@@ -217,8 +232,20 @@
             :key="txn.id"
             class="txn-row"
           >
-            <div class="txn-icon" :class="txn.amount > 0 ? 'txn-icon--credit' : 'txn-icon--debit'">
-              <svg v-if="txn.amount > 0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <div class="txn-icon"
+              :style="txn.amount < 0 && store.CAT_META[txn.category] ? {
+                backgroundColor: store.CAT_META[txn.category].color + '1a',
+                color: store.CAT_META[txn.category].color
+              } : {}"
+              :class="{
+                'txn-icon--credit': txn.amount > 0,
+                'txn-icon--debit': txn.amount < 0 && !store.CAT_META[txn.category]
+              }"
+            >
+              <template v-if="txn.amount < 0 && store.CAT_META[txn.category]">
+                <span style="font-size: 1.1rem">{{ store.CAT_META[txn.category].icon }}</span>
+              </template>
+              <svg v-else-if="txn.amount > 0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
               </svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -262,13 +289,13 @@ const isTransferring = ref(false)
 const transferSuccess = ref('')
 const transferError  = ref('')
 
-const transfer = ref({ recipientNric: '', amount: '', note: '' })
+const transfer = ref({ recipientNric: '', amount: '', category: 'Food', note: '' })
 
 function closeTransfer() {
   showTransfer.value   = false
   transferSuccess.value = ''
   transferError.value  = ''
-  transfer.value = { recipientNric: '', amount: '', note: '' }
+  transfer.value = { recipientNric: '', amount: '', category: 'Food', note: '' }
 }
 
 async function submitTransfer() {
@@ -279,7 +306,12 @@ async function submitTransfer() {
 
   const payerNric    = sessionStorage.getItem('nric') || 'T9992445Z'
   const recipientNric = transfer.value.recipientNric.trim().toUpperCase()
-  const narrative    = transfer.value.note.trim() || `Transfer to ${recipientNric}`
+  
+  // Permanently fix categories by embedding them in the narrative
+  const categoryPrefix = `[${transfer.value.category}] `
+  const rawNote = transfer.value.note.trim() || `Transfer to ${recipientNric}`
+  const narrative = categoryPrefix + rawNote
+
   const referenceId  = 'REF' + Date.now()
 
   isTransferring.value = true
@@ -288,6 +320,7 @@ async function submitTransfer() {
     const { data: debitData } = await debitSpendAccount({
       nric:        payerNric,
       amount:      amt,
+      category:    transfer.value.category, 
       narrative,
       referenceId,
     })
@@ -304,6 +337,9 @@ async function submitTransfer() {
 
     // Update local spend balance with what the server returned
     store.balances.spend = debitData.balanceAfter
+    
+    // Refresh transactions to update spending limit/breakdown immediately
+    await store.fetchTransactions()
 
     transferSuccess.value = `S$ ${amt.toFixed(2)} sent to ${recipientNric}. Your new Spend balance is S$ ${Number(debitData.balanceAfter).toFixed(2)}.`
   } catch (err) {
@@ -345,7 +381,7 @@ function fmt(n) {
 </script>
 
 <style scoped>
-.debit-page   { max-width: 1100px; }
+.wallet-page   { max-width: 1100px; }
 .page-header  {
   display: flex;
   align-items: flex-start;
@@ -432,7 +468,8 @@ function fmt(n) {
   color: var(--text-2);
 }
 .optional { text-transform: none; font-weight: 400; color: var(--text-3); }
-.m-field input {
+.m-field input,
+.m-field select {
   padding: 0.55rem 0.85rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -443,10 +480,21 @@ function fmt(n) {
   transition: border-color 0.2s;
   width: 100%;
   box-sizing: border-box;
+  appearance: none; /* Reset for custom background if needed */
 }
-.m-field input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+.m-field input:focus,
+.m-field select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
 .m-field input::placeholder { color: var(--text-3); }
-.m-field input:disabled { opacity: 0.5; }
+.m-field input:disabled,
+.m-field select:disabled { opacity: 0.5; }
+
+/* Add a custom arrow for the select since we use appearance: none */
+.m-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-right: 2.5rem;
+}
 
 .amount-wrap {
   position: relative;
@@ -534,13 +582,13 @@ function fmt(n) {
 .modal-fade-enter-from .modal-box { transform: scale(0.95) translateY(8px); opacity: 0; }
 .modal-fade-leave-to { opacity: 0; }
 
-.debit-layout {
+.wallet-layout {
   display: grid;
   grid-template-columns: 340px 1fr;
   gap: 1.25rem;
   align-items: start;
 }
-@media (max-width: 820px) { .debit-layout { grid-template-columns: 1fr; } }
+@media (max-width: 820px) { .wallet-layout { grid-template-columns: 1fr; } }
 
 .left-col { display: flex; flex-direction: column; gap: 1.25rem; }
 
@@ -677,11 +725,15 @@ function fmt(n) {
 }
 .cat-bar-fill {
   height: 100%;
-  background: var(--purple);
   border-radius: 2px;
-  transition: width 0.8s ease;
+  transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .cat-amount { font-size: 0.78rem; color: var(--text-2); white-space: nowrap; }
+.cat-row--credited {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
 
 /* Transactions */
 .transactions-card { }

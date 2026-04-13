@@ -1,6 +1,6 @@
 /**
  * accountService.js
- * Stub for Account / Debit Card services.
+ * Stub for Account / Virtual Wallet services.
  * Will be wired to OutSystems Checking Account + Deposit Account + Market Data APIs.
  */
 

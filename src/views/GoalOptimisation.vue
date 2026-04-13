@@ -298,13 +298,20 @@ function storageKey() {
 
 function persistSession() {
   try {
-    localStorage.setItem(storageKey(), JSON.stringify({
+    const data = {
       phase:          phase.value,
       chatSessionId:  chatSessionId.value,
       result:         result.value,
       goalSummary:    goalSummary.value,
       chatHistory:    chatHistory.value,
-    }))
+    }
+    localStorage.setItem(storageKey(), JSON.stringify(data))
+
+    // Also save a dedicated "active goal" key that doesn't get cleared on reset
+    if (goalSummary.value.type) {
+      const nric = sessionStorage.getItem('nric') || 'anonymous'
+      localStorage.setItem(`fp_active_goal_${nric}`, JSON.stringify(goalSummary.value))
+    }
   } catch (_) { /* storage full — silently ignore */ }
 }
 
@@ -451,9 +458,14 @@ async function submitFirstTurn() {
     chatSessionId.value = data.ChatSessionId
     result.value        = data
     goalSummary.value   = {
-      type:   form.value.goalType,
-      target: form.value.targetAmount,
-      months: form.value.timelineMonths,
+      type:         form.value.goalType,
+      target:       form.value.targetAmount,
+      months:       form.value.timelineMonths,
+      salaryAmount: form.value.salaryAmount,
+      savePct:      data.Output.recommended_save_pct || 40,
+      investPct:    data.Output.recommended_invest_pct || 30,
+      spendPct:     data.Output.recommended_spend_pct || 30,
+      updatedAt:    new Date().toISOString()
     }
 
     // Seed chat history with the AI's first reasoning message
