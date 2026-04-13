@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getGoalProgress, optimizeSplit } from '../services/goalService.js'
-import { getDebitCardInfo } from '../services/accountService.js'
+import { optimizeSplit } from '../services/goalService.js'
 import { getTransactionHistory, updateUserPercentage } from '../api/users.js'
 import { getDashboardMetrics } from '../api/dashboard.js'
 import { updateSplit } from '../api/chatbot.js'
@@ -27,7 +26,7 @@ export const useFinanceStore = defineStore('finance', () => {
     avatarInitials:  getInitials(sessionName),
   })
 
-  const balances = ref({ save: 12450.00, invest: 8200.00, spend: 3100.00 })
+  const balances = ref({ save: 0, invest: 0, spend: 0 })
   const splitSettings  = ref({ save: sessionSave, invest: sessionInvest, spend: sessionSpend })
   const pendingSettings= ref({ save: sessionSave, invest: sessionInvest, spend: sessionSpend })
 
@@ -103,6 +102,10 @@ export const useFinanceStore = defineStore('finance', () => {
 
     splitSettings.value  = { save, invest, spend }
     pendingSettings.value = { save, invest, spend }
+
+    // Clear previous user's balances and transactions so stale data never shows
+    balances.value      = { save: 0, invest: 0, spend: 0 }
+    transactions.value  = []
 
     chatMessages.value = [{
       id:      'msg-0',
