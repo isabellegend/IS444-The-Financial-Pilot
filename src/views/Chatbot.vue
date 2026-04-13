@@ -58,14 +58,15 @@
     <!-- Input bar -->
     <div class="chat-input-bar">
       <div class="chat-input-wrap card">
-        <input
+        <textarea
           ref="inputEl"
           v-model="inputText"
-          type="text"
+          rows="1"
           class="chat-input"
           placeholder="Ask me anything… e.g. 'How do I hit my goal by Dec 2026?'"
           :disabled="store.isChatLoading"
-          @keydown.enter.prevent="send"
+          @input="adjustHeight"
+          @keydown.enter.exact.prevent="send"
         />
         <button
           class="send-btn"
@@ -111,17 +112,35 @@ const quickPrompts = [
   'Am I spending too much?',
 ]
 
+function adjustHeight() {
+  if (!inputEl.value) return
+  // Reset height to shrink if text is deleted
+  inputEl.value.style.height = 'auto'
+  // Set to scrollHeight to fit content
+  inputEl.value.style.height = inputEl.value.scrollHeight + 'px'
+}
+
 async function send() {
   const text = inputText.value.trim()
   if (!text) return
   inputText.value = ''
+  
+  // Reset textarea height after sending
+  nextTick(() => {
+    adjustHeight()
+  })
+
   await store.sendChat(text)
   scrollToBottom()
 }
 
 function sendQuick(q) {
   inputText.value = q
-  send()
+  // Need to adjust height after setting quick prompt
+  nextTick(() => {
+    adjustHeight()
+    send()
+  })
 }
 
 function scrollToBottom() {
@@ -304,7 +323,7 @@ function fmtTime(ts) {
 .chat-input-bar { margin-bottom: 0.75rem; }
 .chat-input-wrap {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.75rem;
   padding: 0.65rem 0.65rem 0.65rem 1.1rem;
 }
@@ -315,7 +334,12 @@ function fmtTime(ts) {
   outline: none;
   color: var(--text);
   font-size: 0.9rem;
-  padding: 0;
+  padding: 0.45rem 0;
+  resize: none;
+  max-height: 200px;
+  line-height: 1.5;
+  font-family: inherit;
+  overflow-y: auto;
 }
 .chat-input::placeholder { color: var(--text-3); }
 .chat-input:disabled { opacity: 0.5; }

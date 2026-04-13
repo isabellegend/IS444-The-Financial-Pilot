@@ -255,14 +255,15 @@
 
         <!-- Chat input -->
         <div class="card chat-input-wrap">
-          <input
+          <textarea
             ref="chatInputEl"
             v-model="followUpText"
-            type="text"
+            rows="1"
             class="chat-input"
             placeholder="Ask a follow-up… e.g. 'I want my spend above S$1500'"
             :disabled="isLoading"
-            @keydown.enter.prevent="sendFollowUp"
+            @input="adjustHeight"
+            @keydown.enter.exact.prevent="sendFollowUp"
           />
           <button
             class="send-btn"
@@ -423,6 +424,12 @@ const feasibilityLabel = computed(() => {
   return 'Feasible'
 })
 
+function adjustHeight() {
+  if (!chatInputEl.value) return
+  chatInputEl.value.style.height = 'auto'
+  chatInputEl.value.style.height = chatInputEl.value.scrollHeight + 'px'
+}
+
 // ── Actions ────────────────────────────────────────────────────
 async function submitFirstTurn() {
   formError.value = ''
@@ -478,6 +485,11 @@ async function sendFollowUp() {
   if (!text || isLoading.value) return
 
   followUpText.value = ''
+  
+  // Reset textarea height
+  nextTick(() => {
+    adjustHeight()
+  })
 
   // Add user bubble
   chatHistory.value.push({
@@ -1007,7 +1019,7 @@ select { cursor: pointer; }
 /* Chat input */
 .chat-input-wrap {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.65rem;
   padding: 0.6rem 0.6rem 0.6rem 1rem;
 }
@@ -1018,6 +1030,12 @@ select { cursor: pointer; }
   outline: none;
   color: var(--text);
   font-size: 0.875rem;
+  padding: 0.35rem 0;
+  resize: none;
+  max-height: 180px;
+  line-height: 1.5;
+  font-family: inherit;
+  overflow-y: auto;
 }
 .chat-input::placeholder { color: var(--text-3); }
 .chat-input:disabled { opacity: 0.5; }
