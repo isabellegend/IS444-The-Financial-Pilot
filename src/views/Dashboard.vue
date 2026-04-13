@@ -6,18 +6,24 @@
         <h1 class="page-title">Dashboard</h1>
         <p class="page-sub">Welcome back, {{ store.user.name.split(' ')[0] }}</p>
       </div>
-      <button
-        class="btn btn-outline"
-        :disabled="store.isRefreshing"
-        @click="store.refreshDashboard()"
-      >
-        <span v-if="store.isRefreshing" class="spinner" />
-        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        {{ store.isRefreshing ? 'Refreshing…' : 'Refresh' }}
-      </button>
+      <div class="header-actions">
+        <div class="total-balance">
+          <span class="total-balance__label">Total Balance</span>
+          <span class="total-balance__val mono">S$ {{ fmt(store.totalBalance) }}</span>
+        </div>
+        <button
+          class="btn btn-outline"
+          :disabled="store.isRefreshing"
+          @click="store.refreshDashboard()"
+        >
+          <span v-if="store.isRefreshing" class="spinner" />
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          {{ store.isRefreshing ? 'Refreshing…' : 'Refresh' }}
+        </button>
+      </div>
     </div>
 
     <!-- Bucket Cards -->
@@ -31,42 +37,73 @@
       />
     </section>
 
-    <!-- Split Summary + Goal -->
+    <!-- Row 2: Wallet Allocation + Goal Progress -->
     <div class="lower-grid">
-      <!-- This Month's Split -->
+
+      <!-- Wallet Allocation card (donut + breakdown) -->
       <div class="card split-card">
-        <div class="split-card__header">
+        <div class="card-head-row">
           <div>
-            <h3>This Month's Split</h3>
+            <h3>Wallet Allocation</h3>
             <p class="label-sm">Last credited {{ store.lastSplitEvent.date }}</p>
           </div>
           <span class="gross-badge mono">S$ {{ fmt(store.lastSplitEvent.gross) }}</span>
         </div>
-        <div class="split-rows">
-          <div v-for="row in splitRows" :key="row.key" class="split-row">
-            <div class="split-row__left">
-              <span class="dot" :style="{ background: row.color }" />
-              <span>{{ row.label }}</span>
-            </div>
-            <div class="split-row__right">
-              <div class="split-bar-track">
-                <div
-                  class="split-bar-fill"
-                  :style="{
-                    width: store.splitSettings[row.key] + '%',
-                    background: row.color,
-                    boxShadow: `0 0 8px ${row.color}55`,
-                  }"
-                />
+        <div class="split-body">
+          <!-- Donut chart -->
+          <div class="donut-wrap">
+            <svg viewBox="0 0 100 100" class="donut-svg">
+              <!-- Track -->
+              <circle cx="50" cy="50" r="36" fill="none" stroke-width="12"
+                class="donut-track" />
+              <!-- Segments -->
+              <circle
+                v-for="seg in donutSegments" :key="seg.key"
+                cx="50" cy="50" r="36"
+                fill="none"
+                :stroke="seg.color"
+                stroke-width="12"
+                :stroke-dasharray="`${seg.length} ${CIRCUMFERENCE - seg.length}`"
+                :transform="`rotate(${seg.startAngle}, 50, 50)`"
+                class="donut-seg"
+              />
+              <!-- Center labels -->
+              <text x="50" y="47" text-anchor="middle" font-size="7.5"
+                font-family="system-ui, sans-serif" fill="currentColor" class="donut-label-sm">Total</text>
+              <text x="50" y="61" text-anchor="middle" font-size="11"
+                font-family="'Courier New', monospace" font-weight="600" fill="currentColor" class="donut-label-val">
+                {{ store.totalBalance >= 1000 ? (store.totalBalance / 1000).toFixed(1) + 'k' : fmt(store.totalBalance) }}
+              </text>
+            </svg>
+          </div>
+
+          <!-- Breakdown rows -->
+          <div class="split-rows">
+            <div v-for="row in splitRows" :key="row.key" class="split-row">
+              <div class="split-row__left">
+                <span class="dot" :style="{ background: row.color }" />
+                <span>{{ row.label }}</span>
               </div>
-              <span class="mono split-amount">S$ {{ fmt(store.lastSplitEvent[row.key]) }}</span>
-              <span class="mono split-pct">{{ store.splitSettings[row.key] }}%</span>
+              <div class="split-row__right">
+                <div class="split-bar-track">
+                  <div
+                    class="split-bar-fill"
+                    :style="{
+                      width: store.splitSettings[row.key] + '%',
+                      background: row.color,
+                      boxShadow: `0 0 8px ${row.color}55`,
+                    }"
+                  />
+                </div>
+                <span class="mono split-amount">S$ {{ fmt(store.lastSplitEvent[row.key]) }}</span>
+                <span class="mono split-pct">{{ store.splitSettings[row.key] }}%</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Goal Progress -->
+      <!-- Goal Progress card (radial arc) -->
       <div class="card goal-card">
         <div class="goal-card__header">
           <span class="goal-emoji">{{ store.primaryGoal.emoji }}</span>
@@ -75,21 +112,48 @@
             <p class="label-sm">Target by {{ store.primaryGoal.deadline }}</p>
           </div>
         </div>
-        <div class="goal-amounts">
-          <span class="mono goal-current">S$ {{ fmtK(store.primaryGoal.current) }}</span>
-          <span class="goal-sep">/</span>
-          <span class="mono goal-target">S$ {{ fmtK(store.primaryGoal.target) }}</span>
+
+        <div class="goal-radial-wrap">
+          <!-- Radial arc -->
+          <div class="goal-radial">
+            <svg viewBox="0 0 100 100" class="goal-radial-svg">
+              <circle cx="50" cy="50" r="38" fill="none" stroke-width="9" class="donut-track" />
+              <circle cx="50" cy="50" r="38"
+                fill="none" stroke="#F5C842" stroke-width="9" stroke-linecap="round"
+                :stroke-dasharray="`${goalArcLength} ${GOAL_CIRCUMFERENCE - goalArcLength}`"
+                transform="rotate(-90, 50, 50)"
+                class="goal-arc"
+              />
+              <text x="50" y="46" text-anchor="middle" font-size="14"
+                font-family="'Courier New', monospace" font-weight="700" fill="#F5C842">
+                {{ store.primaryGoalPct }}%
+              </text>
+              <text x="50" y="60" text-anchor="middle" font-size="7.5"
+                font-family="system-ui, sans-serif" fill="currentColor" class="donut-label-sm">
+                reached
+              </text>
+            </svg>
+          </div>
+
+          <!-- Amount stack -->
+          <div class="goal-amounts-stack">
+            <div class="goal-amount-row">
+              <span class="goal-amount-label">Saved</span>
+              <span class="mono goal-amount-val">S$ {{ fmtK(store.primaryGoal.current) }}</span>
+            </div>
+            <div class="goal-amount-row">
+              <span class="goal-amount-label">Target</span>
+              <span class="mono goal-amount-val dimmed">S$ {{ fmtK(store.primaryGoal.target) }}</span>
+            </div>
+            <div class="goal-amount-row">
+              <span class="goal-amount-label">Remaining</span>
+              <span class="mono goal-amount-val danger">
+                S$ {{ fmtK(store.primaryGoal.target - store.primaryGoal.current) }}
+              </span>
+            </div>
+          </div>
         </div>
-        <div class="goal-bar-track">
-          <div
-            class="goal-bar-fill"
-            :style="{ width: store.primaryGoalPct + '%' }"
-          />
-        </div>
-        <div class="goal-footer">
-          <span class="mono goal-pct-label">{{ store.primaryGoalPct }}% reached</span>
-          <span class="goal-remaining">S$ {{ fmtK(store.primaryGoal.target - store.primaryGoal.current) }} to go</span>
-        </div>
+
         <!-- Second goal mini -->
         <div v-if="store.goals[1]" class="mini-goal">
           <span>{{ store.goals[1].emoji }} {{ store.goals[1].name }}</span>
@@ -99,26 +163,102 @@
               :style="{ width: Math.round((store.goals[1].current / store.goals[1].target) * 100) + '%' }"
             />
           </div>
-          <span class="mono mini-goal-pct">{{ Math.round((store.goals[1].current / store.goals[1].target) * 100) }}%</span>
+          <span class="mono mini-goal-pct">
+            {{ Math.round((store.goals[1].current / store.goals[1].target) * 100) }}%
+          </span>
         </div>
       </div>
+    </div>
+
+    <!-- Row 3: Spending by Category + Recent Transactions -->
+    <div class="charts-grid">
+
+      <!-- Spending Breakdown -->
+      <div class="card category-card">
+        <h3>Spending Breakdown</h3>
+        <p class="label-sm" style="margin-bottom: 1.25rem;">
+          Debit transactions · last {{ store.transactions.length }} records
+        </p>
+        <div v-if="spendByCategory.length === 0" class="cat-empty">
+          No debit transactions yet
+        </div>
+        <div v-else class="cat-list">
+          <div v-for="(cat, i) in spendByCategory" :key="cat.cat" class="cat-row">
+            <div class="cat-row__head">
+              <span class="cat-dot" :style="{ background: spendColor(i) }" />
+              <span class="cat-name">{{ cat.cat }}</span>
+              <span class="cat-pct mono" :style="{ color: spendColor(i) }">{{ cat.pct }}%</span>
+              <span class="cat-amt mono">S$ {{ fmt(cat.amt) }}</span>
+            </div>
+            <div class="cat-bar-track">
+              <div
+                class="cat-bar-fill"
+                :style="{ width: cat.pct + '%', background: spendColor(i) }"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="card txn-card">
+        <div class="card-head-row">
+          <div>
+            <h3>Recent Transactions</h3>
+            <p class="label-sm">Spend wallet activity</p>
+          </div>
+        </div>
+        <div v-if="recentTxns.length === 0" class="cat-empty">No transactions yet</div>
+        <div v-else class="txn-list">
+          <div v-for="txn in recentTxns" :key="txn.id" class="txn-row">
+            <div class="txn-icon" :class="txn.amount < 0 ? 'txn-icon--debit' : 'txn-icon--credit'">
+              <svg v-if="txn.amount < 0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+              </svg>
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </div>
+            <div class="txn-info">
+              <span class="txn-merchant">{{ txn.merchant }}</span>
+              <span class="txn-meta">
+                <span class="txn-type-pill" :class="txn.amount < 0 ? 'pill--debit' : 'pill--credit'">
+                  {{ txn.amount < 0 ? 'Debit' : 'Credit' }}
+                </span>
+                · {{ txn.date }}
+              </span>
+            </div>
+            <span class="txn-amount mono" :class="txn.amount < 0 ? 'neg' : 'pos'">
+              {{ txn.amount < 0 ? '−' : '+' }}S$ {{ fmt(Math.abs(txn.amount)) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useFinanceStore } from '../stores/finance.js'
 import BucketCard from '../components/BucketCard.vue'
 
 const store = useFinanceStore()
+onMounted(() => {
+  store.refreshDashboard()
+  store.fetchTransactions()
+})
 
-onMounted(() => store.refreshDashboard())
+// ── Chart constants ─────────────────────────────────────────────
+const CIRCUMFERENCE      = 2 * Math.PI * 36   // donut r=36  ≈ 226.19
+const GOAL_CIRCUMFERENCE = 2 * Math.PI * 38   // goal  r=38  ≈ 238.76
 
+// ── Bucket definitions ──────────────────────────────────────────
 const buckets = [
-  { key: 'save',   label: 'Save',   color: '#00D4C8', dim: 'rgba(0,212,200,0.1)',   glow: 'rgba(0,212,200,0.2)'  },
-  { key: 'invest', label: 'Invest', color: '#F5C842', dim: 'rgba(245,200,66,0.1)',  glow: 'rgba(245,200,66,0.2)' },
-  { key: 'spend',  label: 'Spend',  color: '#A855F7', dim: 'rgba(168,85,247,0.1)',  glow: 'rgba(168,85,247,0.2)' },
+  { key: 'save',   label: 'Save',   color: '#00D4C8', dim: 'rgba(0,212,200,0.1)',  glow: 'rgba(0,212,200,0.2)' },
+  { key: 'invest', label: 'Invest', color: '#F5C842', dim: 'rgba(245,200,66,0.1)', glow: 'rgba(245,200,66,0.2)' },
+  { key: 'spend',  label: 'Spend',  color: '#A855F7', dim: 'rgba(168,85,247,0.1)', glow: 'rgba(168,85,247,0.2)' },
 ]
 
 const splitRows = [
@@ -127,6 +267,51 @@ const splitRows = [
   { key: 'spend',  label: 'Spend',  color: '#A855F7' },
 ]
 
+// ── Donut chart ─────────────────────────────────────────────────
+const donutSegments = computed(() => {
+  const s = store.splitSettings
+  const segs = [
+    { key: 'save',   pct: s.save,   color: '#00D4C8' },
+    { key: 'invest', pct: s.invest, color: '#F5C842' },
+    { key: 'spend',  pct: s.spend,  color: '#A855F7' },
+  ]
+  let cumPct = 0
+  const GAP = 1.2  // visual gap between segments (arc units)
+  return segs.map(seg => {
+    const startAngle = -90 + (cumPct / 100) * 360
+    const length = Math.max((seg.pct / 100) * CIRCUMFERENCE - GAP, 0)
+    cumPct += seg.pct
+    return { ...seg, length, startAngle }
+  })
+})
+
+// ── Goal radial arc ─────────────────────────────────────────────
+const goalArcLength = computed(() =>
+  (store.primaryGoalPct / 100) * GOAL_CIRCUMFERENCE
+)
+
+// ── Spending breakdown (grouped by merchant/narrative) ───────────
+const SPEND_PALETTE = ['#00D4C8', '#F5C842', '#A855F7', '#F97316', '#3B82F6']
+function spendColor(idx) { return SPEND_PALETTE[idx % SPEND_PALETTE.length] }
+
+const spendByCategory = computed(() => {
+  const groups = {}
+  store.transactions.forEach(t => {
+    if (t.amount < 0) {
+      const label = (t.merchant || '—').trim()
+      groups[label] = (groups[label] || 0) + Math.abs(t.amount)
+    }
+  })
+  const total = Object.values(groups).reduce((a, b) => a + b, 0) || 1
+  return Object.entries(groups)
+    .map(([cat, amt]) => ({ cat, amt, pct: Math.round((amt / total) * 100) }))
+    .sort((a, b) => b.amt - a.amt)
+    .slice(0, 5)
+})
+
+const recentTxns = computed(() => store.transactions.slice(0, 5))
+
+// ── Formatters ──────────────────────────────────────────────────
 function fmt(n) {
   return Number(n).toLocaleString('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -139,6 +324,7 @@ function fmtK(n) {
 <style scoped>
 .dashboard { max-width: 1100px; }
 
+/* ── Header ── */
 .page-header {
   display: flex;
   align-items: flex-start;
@@ -147,43 +333,71 @@ function fmtK(n) {
   gap: 1rem;
   flex-wrap: wrap;
 }
-.page-title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.2rem;
-}
-.page-sub { color: var(--text-2); font-size: 0.875rem; }
+.page-title { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.2rem; }
+.page-sub   { color: var(--text-2); font-size: 0.875rem; }
 
-/* Buckets */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.total-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+.total-balance__label {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.total-balance__val {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── Bucket cards ── */
 .buckets {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
   margin-bottom: 1.5rem;
 }
-@media (max-width: 900px) { .buckets { grid-template-columns: 1fr; } }
 @media (min-width: 640px) and (max-width: 900px) { .buckets { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 639px) { .buckets { grid-template-columns: 1fr; } }
 
-/* Lower grid */
+/* ── Lower grid (allocation + goal) ── */
 .lower-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 @media (max-width: 820px) { .lower-grid { grid-template-columns: 1fr; } }
 
-/* Split card */
-.split-card__header {
+/* ── Charts grid (categories + transactions) ── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+@media (max-width: 820px) { .charts-grid { grid-template-columns: 1fr; } }
+
+/* ── Shared card head row ── */
+.card-head-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
   flex-wrap: wrap;
 }
-.split-card__header h3 { font-size: 1rem; margin-bottom: 0.2rem; }
+.card-head-row h3 { font-size: 1rem; margin-bottom: 0.2rem; }
 .label-sm { font-size: 0.75rem; color: var(--text-3); }
+
 .gross-badge {
   background: var(--teal-dim);
   color: var(--teal);
@@ -193,7 +407,24 @@ function fmtK(n) {
   border-radius: 20px;
   white-space: nowrap;
 }
-.split-rows { display: flex; flex-direction: column; gap: 1.1rem; }
+
+/* ── Wallet Allocation (split card) ── */
+.split-body {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Donut */
+.donut-wrap { width: 108px; flex-shrink: 0; }
+.donut-svg  { width: 100%; height: auto; display: block; }
+.donut-track { stroke: var(--border); }
+.donut-seg   { transition: stroke-dasharray 0.9s cubic-bezier(0.4,0,0.2,1); }
+.donut-label-sm  { fill: var(--text-3); }
+.donut-label-val { fill: var(--text); }
+
+/* Breakdown rows */
+.split-rows { flex: 1; display: flex; flex-direction: column; gap: 1.1rem; }
 .split-row {
   display: flex;
   align-items: center;
@@ -206,7 +437,7 @@ function fmtK(n) {
   gap: 0.5rem;
   font-size: 0.85rem;
   color: var(--text-2);
-  min-width: 58px;
+  min-width: 55px;
 }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .split-row__right {
@@ -225,12 +456,12 @@ function fmtK(n) {
 .split-bar-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 1s cubic-bezier(0.4,0,0.2,1);
 }
 .split-amount { font-size: 0.78rem; color: var(--text); min-width: 75px; text-align: right; }
 .split-pct    { font-size: 0.72rem; color: var(--text-3); min-width: 28px; text-align: right; }
 
-/* Goal card */
+/* ── Goal card ── */
 .goal-card__header {
   display: flex;
   align-items: center;
@@ -239,37 +470,30 @@ function fmtK(n) {
 }
 .goal-emoji { font-size: 1.75rem; }
 .goal-card__header h3 { font-size: 1rem; margin-bottom: 0.2rem; }
-.goal-amounts {
+
+.goal-radial-wrap {
   display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  margin-bottom: 0.75rem;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
 }
-.goal-current { font-size: 1.5rem; color: var(--gold); font-weight: 500; }
-.goal-sep     { color: var(--text-3); }
-.goal-target  { font-size: 0.9rem; color: var(--text-2); }
-.goal-bar-track {
-  height: 8px;
-  background: var(--border);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 0.6rem;
+.goal-radial { width: 108px; flex-shrink: 0; }
+.goal-radial-svg { width: 100%; height: auto; display: block; }
+.goal-arc {
+  transition: stroke-dasharray 1.2s cubic-bezier(0.4,0,0.2,1);
+  filter: drop-shadow(0 0 6px rgba(245,200,66,0.4));
 }
-.goal-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--gold), #ffb800);
-  border-radius: 4px;
-  box-shadow: 0 0 10px rgba(245,200,66,0.35);
-  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.goal-footer {
+
+.goal-amounts-stack { flex: 1; display: flex; flex-direction: column; gap: 0.7rem; }
+.goal-amount-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.25rem;
 }
-.goal-pct-label { font-size: 0.8rem; color: var(--gold); }
-.goal-remaining { font-size: 0.75rem; color: var(--text-3); }
+.goal-amount-label { font-size: 0.75rem; color: var(--text-3); }
+.goal-amount-val   { font-size: 0.85rem; color: var(--text); }
+.goal-amount-val.dimmed { color: var(--text-2); }
+.goal-amount-val.danger { color: var(--danger); }
 
 .mini-goal {
   display: flex;
@@ -280,18 +504,85 @@ function fmtK(n) {
   font-size: 0.8rem;
   color: var(--text-2);
 }
-.mini-goal-bar {
-  flex: 1;
-  height: 4px;
+.mini-goal-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.mini-goal-fill { height: 100%; background: var(--teal); border-radius: 2px; transition: width 1s ease; }
+.mini-goal-pct  { font-size: 0.75rem; color: var(--teal); white-space: nowrap; }
+
+/* ── Spending Breakdown ── */
+.category-card h3 { margin-bottom: 0.2rem; }
+.cat-empty { font-size: 0.82rem; color: var(--text-3); padding: 1rem 0; }
+.cat-list { display: flex; flex-direction: column; gap: 0.9rem; }
+.cat-row__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+.cat-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.cat-name { font-size: 0.82rem; color: var(--text-2); flex: 1; }
+.cat-pct  { font-size: 0.77rem; font-weight: 600; }
+.cat-amt  { font-size: 0.75rem; color: var(--text-3); min-width: 68px; text-align: right; }
+.cat-bar-track {
+  height: 5px;
   background: var(--border);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
-.mini-goal-fill {
+.cat-bar-fill {
   height: 100%;
-  background: var(--teal);
-  border-radius: 2px;
-  transition: width 1s ease;
+  border-radius: 3px;
+  transition: width 0.9s ease;
+  opacity: 0.85;
 }
-.mini-goal-pct { font-size: 0.75rem; color: var(--teal); white-space: nowrap; }
+
+/* ── Recent Transactions ── */
+.txn-card h3 { margin-bottom: 0.2rem; }
+.txn-list { display: flex; flex-direction: column; }
+.txn-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.txn-row:last-child { border-bottom: none; }
+.txn-icon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.txn-icon--debit  { background: rgba(239,68,68,0.12); color: var(--danger); }
+.txn-icon--credit { background: rgba(0,212,200,0.12); color: var(--teal); }
+.txn-type-pill {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill--debit  { background: rgba(239,68,68,0.12); color: var(--danger); }
+.pill--credit { background: rgba(0,212,200,0.12); color: var(--teal); }
+.txn-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.txn-merchant {
+  font-size: 0.85rem;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.txn-meta   { font-size: 0.7rem; color: var(--text-3); }
+.txn-amount { font-size: 0.82rem; font-weight: 500; white-space: nowrap; }
+.txn-amount.neg { color: var(--danger); }
+.txn-amount.pos { color: var(--teal); }
 </style>

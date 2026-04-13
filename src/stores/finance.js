@@ -36,18 +36,7 @@ export const useFinanceStore = defineStore('finance', () => {
     { id: 'goal-2', name: 'Emergency Fund',    target: 15000, current: 12450, deadline: 'Jun 2026', emoji: '🛡️' },
   ])
 
-  const transactions = ref([
-    { id: 'txn-001', date: '2026-03-24', merchant: 'Grab Food',        category: 'Food',       amount: -18.90,  status: 'settled' },
-    { id: 'txn-002', date: '2026-03-23', merchant: 'FairPrice Online',  category: 'Groceries',  amount: -67.40,  status: 'settled' },
-    { id: 'txn-003', date: '2026-03-22', merchant: 'Netflix',           category: 'Entertain',  amount: -18.98,  status: 'settled' },
-    { id: 'txn-004', date: '2026-03-21', merchant: 'Uniqlo ION',        category: 'Shopping',   amount: -89.00,  status: 'settled' },
-    { id: 'txn-005', date: '2026-03-20', merchant: 'Spotify',           category: 'Entertain',  amount: -9.98,   status: 'settled' },
-    { id: 'txn-006', date: '2026-03-19', merchant: 'Shell Buona Vista', category: 'Transport',  amount: -55.00,  status: 'settled' },
-    { id: 'txn-007', date: '2026-03-18', merchant: 'Koufu @ One North', category: 'Food',       amount: -8.50,   status: 'settled' },
-    { id: 'txn-008', date: '2026-03-17', merchant: 'Amazon SG',         category: 'Shopping',   amount: -112.00, status: 'settled' },
-    { id: 'txn-009', date: '2026-03-16', merchant: 'Decathlon',         category: 'Sports',     amount: -45.00,  status: 'settled' },
-    { id: 'txn-010', date: '2026-03-15', merchant: 'Wingstop',          category: 'Food',       amount: -22.40,  status: 'settled' },
-  ])
+  const transactions = ref([])
 
   const debitCard = ref({
     cardNumber: '**** **** **** 4821',
@@ -129,9 +118,9 @@ export const useFinanceStore = defineStore('finance', () => {
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       const { data } = await getDashboardMetrics(nric)
       balances.value = {
-        save:   parseFloat(data.DepositBalance),
-        invest: data.totalPortfolioSizeInBaseCurrency,
-        spend:  parseFloat(data.SpendWalletBalance),
+        save:   parseFloat(data.DepositBalance)                   || 0,
+        invest: parseFloat(data.totalPortfolioSizeInBaseCurrency) || 0,
+        spend:  parseFloat(data.SpendWalletBalance)               || 0,
       }
     } finally {
       isRefreshing.value = false
@@ -143,7 +132,17 @@ export const useFinanceStore = defineStore('finance', () => {
     try {
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       const { data } = await getTransactionHistory(nric)
-      transactions.value = data
+      const rawList = Array.isArray(data) ? data : (data?.List ?? data?.Transactions ?? [])
+      transactions.value = rawList.map(t => ({
+        id:           t.transactionId,
+        date:         t.transactionDate ? t.transactionDate.slice(0, 10) : '',
+        merchant:     t.narrative || '—',
+        type:         t.transactionType,           // 'DEBIT' | 'CREDIT'
+        amount:       t.transactionType === 'DEBIT' ? -Number(t.amount) : Number(t.amount),
+        balanceAfter: Number(t.balanceAfter),
+        referenceId:  t.referenceId || '',
+        status:       'settled',
+      }))
     } finally {
       isLoadingTransactions.value = false
     }

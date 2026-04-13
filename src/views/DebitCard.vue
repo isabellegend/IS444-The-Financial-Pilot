@@ -214,11 +214,11 @@
         <div v-else class="txn-list">
           <div
             v-for="txn in store.transactions"
-            :key="txn.transactionId"
+            :key="txn.id"
             class="txn-row"
           >
-            <div class="txn-icon" :class="txn.transactionType === 'CREDIT' ? 'txn-icon--credit' : 'txn-icon--debit'">
-              <svg v-if="txn.transactionType === 'CREDIT'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <div class="txn-icon" :class="txn.amount > 0 ? 'txn-icon--credit' : 'txn-icon--debit'">
+              <svg v-if="txn.amount > 0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
               </svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -227,18 +227,18 @@
             </div>
 
             <div class="txn-info">
-              <span class="txn-merchant">{{ txn.narrative }}</span>
+              <span class="txn-merchant">{{ txn.merchant }}</span>
               <span class="txn-meta">
                 <span class="txn-ref mono">{{ txn.referenceId }}</span>
-                · {{ fmtDate(txn.transactionDate) }}
+                · {{ fmtDate(txn.date) }}
               </span>
             </div>
 
             <div class="txn-right">
-              <span class="mono txn-amount" :class="txn.transactionType === 'CREDIT' ? 'amount-pos' : 'amount-neg'">
-                {{ txn.transactionType === 'CREDIT' ? '+' : '-' }}S$ {{ txn.amount.toFixed(2) }}
+              <span class="mono txn-amount" :class="txn.amount > 0 ? 'amount-pos' : 'amount-neg'">
+                {{ txn.amount > 0 ? '+' : '−' }}S$ {{ Math.abs(txn.amount).toFixed(2) }}
               </span>
-              <span class="txn-balance mono">Bal: S$ {{ Number(txn.balanceAfter).toFixed(2) }}</span>
+              <span class="txn-balance mono">Bal: S$ {{ txn.balanceAfter.toFixed(2) }}</span>
             </div>
           </div>
         </div>
@@ -327,14 +327,16 @@ const limitColor = computed(() => {
 const txnSummary = computed(() => {
   let debit = 0, credit = 0
   for (const txn of store.transactions) {
-    if (txn.transactionType === 'DEBIT')  debit  += txn.amount
-    else                                  credit += txn.amount
+    if (txn.amount < 0) debit  += Math.abs(txn.amount)
+    else                credit += txn.amount
   }
   return { debit, credit, total: debit + credit }
 })
 
-function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })
+function fmtDate(d) {
+  if (!d) return '—'
+  const [y, m, day] = d.split('-')
+  return new Date(+y, +m - 1, +day).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function fmt(n) {
@@ -343,7 +345,7 @@ function fmt(n) {
 </script>
 
 <style scoped>
-.debit-page   { max-width: 1000px; }
+.debit-page   { max-width: 1100px; }
 .page-header  {
   display: flex;
   align-items: flex-start;
