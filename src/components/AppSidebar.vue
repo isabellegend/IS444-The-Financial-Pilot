@@ -33,7 +33,7 @@
         <div class="user-avatar">{{ store.user.avatarInitials }}</div>
         <div class="user-info">
           <span class="user-name">{{ store.user.name.split(' ')[0] }}</span>
-          <span class="user-role">Personal</span>
+          <span class="user-role">{{ store.user.customerType }}</span>
         </div>
       </div>
       <button class="logout-btn" @click="logout" title="Sign out">
@@ -63,16 +63,20 @@
 
 <script setup>
 import { RouterLink, useRouter } from 'vue-router'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useFinanceStore } from '../stores/finance.js'
 
 const store    = useFinanceStore()
 const router   = useRouter()
 const collapsed = ref(false)
 
-const navItems = [
+const dashboardRoute = computed(() =>
+  store.user.customerType === 'Corporate' ? '/corporate-dashboard' : '/dashboard'
+)
+
+const navItems = computed(() => [
   {
-    to: '/dashboard',
+    to: dashboardRoute.value,
     label: 'Dashboard',
     shortLabel: 'Home',
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>`,
@@ -95,16 +99,16 @@ const navItems = [
     shortLabel: 'Card',
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
   },
-]
+])
 
 function logout() {
   const nric = sessionStorage.getItem('nric')
-  console.log('[Logout] Clearing session for:', sessionStorage.getItem('fullName'))
   if (nric) localStorage.removeItem(`fp_goal_${nric}`)
   sessionStorage.clear()
   localStorage.removeItem('token')
   localStorage.removeItem('role')
-  console.log('[Logout] Session cleared.')
+  localStorage.removeItem('customerType')
+  store.initFromSession()
   router.push('/login')
 }
 </script>

@@ -18,6 +18,10 @@ const checkingApi = axios.create({
   },
 })
 
+export function getAllUsers() {
+  return userApi.get('/GetAllUsers')
+}
+
 export function createUser(payload) {
   return userApi.post('/Users', payload)
 }
@@ -28,6 +32,10 @@ export function loginUser(payload) {
 
 export function registerAccount(payload) {
   return checkingApi.post('/RegisterAccount', payload)
+}
+
+export function getAccountByNRIC(nric) {
+  return checkingApi.get('/GetAccountByNRIC', { params: { Nric: nric } })
 }
 
 export function getTransactionHistory(nric, { pageNo = 1, pageSize = 20 } = {}) {

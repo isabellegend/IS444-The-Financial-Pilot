@@ -19,9 +19,12 @@ export const useFinanceStore = defineStore('finance', () => {
   const sessionSpend = parseFloat(sessionStorage.getItem('spendPercentage')) || 30
 
   // ── State ──────────────────────────────────────────────────────
+  const sessionCustomerType = sessionStorage.getItem('customerType') || localStorage.getItem('customerType') || 'Retail'
+
   const user = ref({
     id:              sessionStorage.getItem('userId')  || 'user-001',
     name:            sessionName,
+    customerType:    sessionCustomerType,
     checkingAccount: '***-***-4821',
     avatarInitials:  getInitials(sessionName),
   })
@@ -97,6 +100,7 @@ export const useFinanceStore = defineStore('finance', () => {
 
     user.value.id             = sessionStorage.getItem('userId') || 'user-001'
     user.value.name           = name
+    user.value.customerType   = sessionStorage.getItem('customerType') || localStorage.getItem('customerType') || 'Retail'
     user.value.avatarInitials = getInitials(name)
     debitCard.value.cardholderName = name.toUpperCase()
 

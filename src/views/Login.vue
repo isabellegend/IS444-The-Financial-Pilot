@@ -12,6 +12,30 @@
         <span class="brand-name">Financial Pilot</span>
       </div>
 
+      <!-- Customer type selector -->
+      <div class="ctype-tabs">
+        <button
+          type="button"
+          :class="['ctype-tab', { 'ctype-tab--active': customerType === 'Retail' }]"
+          @click="customerType = 'Retail'; clearMessages()"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          Retail Customer
+        </button>
+        <button
+          type="button"
+          :class="['ctype-tab', { 'ctype-tab--active': customerType === 'Corporate' }]"
+          @click="customerType = 'Corporate'; clearMessages()"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+          </svg>
+          Corporate
+        </button>
+      </div>
+
       <!-- Mode tabs -->
       <div class="mode-tabs">
         <button
@@ -33,7 +57,9 @@
       <!-- Heading -->
       <h2>{{ mode === 'signup' ? 'Create your account' : 'Welcome back' }}</h2>
       <p class="login-sub">
-        {{ mode === 'signup' ? 'Set up your Financial Pilot profile' : 'Sign in to your account' }}
+        {{ mode === 'signup'
+          ? `Set up your ${customerType} Financial Pilot profile`
+          : `Sign in to your ${customerType} account` }}
       </p>
 
       <!-- ── SIGN IN FORM ── -->
@@ -94,9 +120,15 @@
             <input v-model="signup.password" type="password" placeholder="Choose a password" required />
           </div>
         </div>
-        <div class="field">
-          <label>TBank ID</label>
-          <input v-model="signup.tbankId" type="text" placeholder="Your TBank account ID" required />
+        <div class="field-row">
+          <div class="field">
+            <label>TBank ID</label>
+            <input v-model="signup.tbankId" type="text" placeholder="Your TBank account ID" required />
+          </div>
+          <div class="field">
+            <label>TBank Account ID</label>
+            <input v-model="signup.tbankAccountId" type="text" placeholder="Your TBank account number" required />
+          </div>
         </div>
 
         <!-- Wallet split -->
@@ -181,10 +213,11 @@ import { useFinanceStore } from '../stores/finance.js'
 
 const router  = useRouter()
 const store   = useFinanceStore()
-const mode    = ref('login')
-const loading = ref(false)
-const error   = ref('')
-const success = ref('')
+const mode         = ref('login')
+const customerType = ref('Retail')
+const loading      = ref(false)
+const error        = ref('')
+const success      = ref('')
 
 // ── Login state ──────────────────────────────────────────────
 const login = ref({ username: '', password: '' })
@@ -202,6 +235,7 @@ const signup = ref({
   investPercentage: 33,
   spendPercentage:  33,
   tbankId:          '',
+  tbankAccountId:   '',
 })
 
 const splitTotal = computed(() =>
@@ -236,9 +270,15 @@ async function handleLogin() {
       throw new Error('Invalid username or password.')
     }
 
-    console.log('[LoginUser] response:', JSON.stringify(data, null, 2))
+    // Validate customer type matches the selected tab
+    const returnedType = data.CustomerType || data.customerType
+    if (returnedType && returnedType !== customerType.value) {
+      const actual = returnedType.toLowerCase()
+      throw new Error(`This account is a ${actual} account. Please use the ${actual} login tab.`)
+    }
 
     // Store session variables
+    const ctype = returnedType || customerType.value
     sessionStorage.setItem('nric',            data.NRIC)
     sessionStorage.setItem('userId',          data.Id)
     sessionStorage.setItem('fullName',        data.FullName)
@@ -246,22 +286,16 @@ async function handleLogin() {
     sessionStorage.setItem('savePercentage',  data.SavePercentage)
     sessionStorage.setItem('investPercentage',data.InvestPercentage)
     sessionStorage.setItem('spendPercentage', data.SpendPercentage)
+    sessionStorage.setItem('customerType',    ctype)
 
-    console.log('[Session] nric:',             data.NRIC)
-    console.log('[Session] userId:',           data.Id)
-    console.log('[Session] fullName:',         data.FullName)
-    console.log('[Session] email:',            data.Email)
-    console.log('[Session] savePercentage:',   data.SavePercentage)
-    console.log('[Session] investPercentage:', data.InvestPercentage)
-    console.log('[Session] spendPercentage:',  data.SpendPercentage)
-
-    localStorage.setItem('token', 'authenticated')
-    localStorage.setItem('role',  'employee')
+    localStorage.setItem('token',        'authenticated')
+    localStorage.setItem('role',         'employee')
+    localStorage.setItem('customerType', ctype)
 
     // Re-hydrate the store with the new user's session data before navigating
     store.initFromSession()
 
-    router.push('/dashboard')
+    router.push(ctype === 'Corporate' ? '/corporate-dashboard' : '/dashboard')
   } catch (err) {
     const msg = err.response?.data?.Errors?.[0] ?? err.message
     error.value = msg || 'Login failed. Please try again.'
@@ -293,9 +327,11 @@ async function handleSignup() {
       username:         signup.value.username,
       password:         signup.value.password,
       tbankId:          signup.value.tbankId,
+      TbankAccountId:   signup.value.tbankAccountId,
       savePercentage:   signup.value.savePercentage,
       investPercentage: signup.value.investPercentage,
       spendPercentage:  signup.value.spendPercentage,
+      CustomerType:     customerType.value,
     }
     console.log('[POST /Users] payload:', JSON.stringify(payload, null, 2))
     await createUser(payload)
@@ -321,7 +357,7 @@ async function handleSignup() {
     success.value = `Account created for ${signup.value.fullName}. You can now sign in.`
     signup.value = {
       fullName: '', nric: '', email: '', phoneNumber: '',
-      address: '', username: '', password: '', tbankId: '',
+      address: '', username: '', password: '', tbankId: '', tbankAccountId: '',
       savePercentage: 34, investPercentage: 33, spendPercentage: 33,
     }
     setTimeout(() => { mode.value = 'login'; success.value = '' }, 2000)
@@ -376,6 +412,35 @@ async function handleSignup() {
   display: flex; align-items: center; justify-content: center;
 }
 .brand-name { font-size: 1rem; font-weight: 700; color: var(--text); }
+
+/* Customer type tabs */
+.ctype-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.ctype-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ctype-tab:hover { color: var(--text-2); border-color: var(--text-3); }
+.ctype-tab--active {
+  background: var(--teal-dim);
+  border-color: rgba(0, 212, 200, 0.4);
+  color: var(--teal);
+}
 
 /* Mode tabs */
 .mode-tabs {
