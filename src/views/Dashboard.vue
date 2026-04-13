@@ -169,7 +169,7 @@
       <div class="card category-card">
         <h3>Spending Breakdown</h3>
         <p class="label-sm" style="margin-bottom: 1.25rem;">
-          Debit transactions · last {{ store.transactions.length }} records
+          Debit transactions · last {{ debitTransactionsCount }} records
         </p>
         <div v-if="spendByCategory.length === 0" class="cat-empty">
           No debit transactions yet
@@ -305,6 +305,10 @@ const spendByCategory = computed(() => {
     icon: cat.icon
   }))
 })
+
+const debitTransactionsCount = computed(() => 
+  store.transactions.filter(t => t.amount < 0).length
+)
 
 const recentTxns = computed(() => store.transactions.slice(0, 5))
 
