@@ -13,7 +13,6 @@
     <!-- Header row -->
     <div class="bucket-card__head">
       <span class="bucket-label">{{ bucket.label }}</span>
-      <span class="bucket-pct mono">{{ pct }}%</span>
     </div>
 
     <!-- Balance (animated counter) -->
@@ -24,10 +23,6 @@
 
     <!-- Ring + subtitle -->
     <div class="bucket-card__foot">
-      <div class="bucket-info">
-        <p class="bucket-info__label">Allocated</p>
-        <p class="bucket-info__val mono">{{ pct }}%</p>
-      </div>
       <CircularRing
         :percentage="pct"
         :color="bucket.color"
