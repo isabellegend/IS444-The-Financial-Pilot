@@ -336,28 +336,22 @@ async function submitTransfer() {
     const isPartial = receipt.Status !== 'Success' && anyBucketWorked
     const warning = isPartial ? ` (Note: Investment auto-buy skipped — funds held in deposit account)` : ''
 
-    // The orchestrator deposits Save+Invest combined into the TBank deposit account.
-    // If PlaceMarketOrder fails or is skipped (StockQuantity ≤ 0), the invest money
-    // is still sitting in the deposit account. Track it so Isabel's dashboard can
-    // split DepositBalance correctly between Save and Invest buckets.
-    //
-    // We detect invest failure by: InvestAmount > 0 but no InvestTransferId returned
-    // (meaning PlaceMarketOrder never succeeded).
     const investAmt = Number(receipt.InvestAmount) || 0
-    // InvestTransferId is a real TBank order ID when PlaceMarketOrder succeeds.
-    // When skipped/failed, OutSystems sets it to "" or "SKIPPED-NO-SHARES" or "0".
-    const rawInvestId = (receipt.InvestTransferId || '').trim()
-    const investPlaced = rawInvestId !== '' && rawInvestId !== '0' && !rawInvestId.startsWith('SKIPPED')
-    console.log('[SalarySplitter] investAmt:', investAmt, 'investPlaced:', investPlaced, 'Status:', receipt.Status)
+    const key       = `fp_pendingInvest_${recipientNric}`
+    const infoKey   = `fp_pendingInvestInfo_${recipientNric}`
+    console.log('[SalarySplitter] Status:', receipt.Status, 'investAmt:', investAmt)
 
-    if (investAmt > 0 && !investPlaced) {
-      const key     = `fp_pendingInvest_${recipientNric}`
-      const infoKey = `fp_pendingInvestInfo_${recipientNric}`
-      const prev = parseFloat(localStorage.getItem(key)) || 0
+    if (receipt.Status === 'Success') {
+      // Full success — PlaceMarketOrder went through, clear any stale pending banner
+      localStorage.removeItem(key)
+      localStorage.removeItem(infoKey)
+      console.log(`[SalarySplitter] Success — cleared pending invest for ${recipientNric}`)
+    } else if (investAmt > 0) {
+      // Partial or failed — invest money is held in deposit, track it for the retail dashboard banner
+      const prev     = parseFloat(localStorage.getItem(key)) || 0
       const newTotal = prev + investAmt
       localStorage.setItem(key, String(newTotal))
 
-      // Store rich info for the dashboard invest card display
       const conversionAmt = Number(receipt.InvestConversionAmount) || 0
       localStorage.setItem(infoKey, JSON.stringify({
         amount:           newTotal,
