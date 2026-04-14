@@ -332,16 +332,19 @@ async function submitTransfer() {
       return
     }
 
+    // PlaceMarketOrder succeeded if the receipt includes stock details
+    const orderFilled = Number(receipt.StockQuantity) > 0
+
     // Build warning for partial success (Save/Spend worked but Invest failed)
-    const isPartial = receipt.Status !== 'Success' && anyBucketWorked
+    const isPartial = !orderFilled && anyBucketWorked
     const warning = isPartial ? ` (Note: Investment auto-buy skipped — funds held in deposit account)` : ''
 
     const investAmt = Number(receipt.InvestAmount) || 0
     const key       = `fp_pendingInvest_${recipientNric}`
     const infoKey   = `fp_pendingInvestInfo_${recipientNric}`
-    console.log('[SalarySplitter] Status:', receipt.Status, 'investAmt:', investAmt)
+    console.log('[SalarySplitter] Status:', receipt.Status, 'orderFilled:', orderFilled, 'investAmt:', investAmt)
 
-    if (receipt.Status === 'Success') {
+    if (orderFilled) {
       // Full success — PlaceMarketOrder went through, clear any stale pending banner
       localStorage.removeItem(key)
       localStorage.removeItem(infoKey)
@@ -372,6 +375,7 @@ async function submitTransfer() {
     if (receipt.SaveAmount)   parts.push(`Save: S$${Number(receipt.SaveAmount).toFixed(2)}`)
     if (receipt.InvestAmount) parts.push(`Invest: S$${Number(receipt.InvestAmount).toFixed(2)}`)
     if (receipt.SpendAmount)  parts.push(`Spend: S$${Number(receipt.SpendAmount).toFixed(2)}`)
+    if (orderFilled) parts.push(`Bought ${receipt.StockQuantity}x ${receipt.StockSymbol} @ S$${Number(receipt.StockPrice).toFixed(2)}`)
 
     transferSuccess.value = `S$ ${amt.toFixed(2)} salary split for ${recipientNric}. ${parts.join(' | ')}${warning}`
   } catch (err) {
