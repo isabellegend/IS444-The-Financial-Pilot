@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-const isLoggedIn    = () => !!localStorage.getItem('token')
+// Both a persisted token AND an active session must exist.
+// sessionStorage is cleared on tab/browser close, so a stale localStorage
+// token after a dev restart correctly redirects back to login.
+const isLoggedIn    = () => !!localStorage.getItem('token') && !!sessionStorage.getItem('nric')
 const customerType  = () => localStorage.getItem('customerType') || 'Retail'
 const defaultHome   = () => customerType() === 'Corporate' ? '/corporate-dashboard' : '/dashboard'
 

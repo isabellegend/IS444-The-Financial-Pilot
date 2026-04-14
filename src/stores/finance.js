@@ -21,10 +21,10 @@ export const useFinanceStore = defineStore('finance', () => {
     'Education':           '🎓',
   }
 
-  const sessionName  = sessionStorage.getItem('fullName') || 'Alex Tan Wei Ming'
-  const sessionSave  = parseFloat(sessionStorage.getItem('savePercentage'))  || 40
-  const sessionInvest= parseFloat(sessionStorage.getItem('investPercentage'))|| 30
-  const sessionSpend = parseFloat(sessionStorage.getItem('spendPercentage')) || 30
+  const sessionName  = sessionStorage.getItem('fullName') || ''
+  const sessionSave  = parseFloat(sessionStorage.getItem('savePercentage'))  || 0
+  const sessionInvest= parseFloat(sessionStorage.getItem('investPercentage'))|| 0
+  const sessionSpend = parseFloat(sessionStorage.getItem('spendPercentage')) || 0
 
   // ── State ──────────────────────────────────────────────────────
   const sessionCustomerType = sessionStorage.getItem('customerType') || localStorage.getItem('customerType') || 'Retail'
@@ -210,12 +210,12 @@ export const useFinanceStore = defineStore('finance', () => {
   }
 
   function initFromSession() {
-    const name   = sessionStorage.getItem('fullName') || 'Alex Tan Wei Ming'
-    const save   = parseFloat(sessionStorage.getItem('savePercentage'))   || 40
-    const invest = parseFloat(sessionStorage.getItem('investPercentage')) || 30
-    const spend  = parseFloat(sessionStorage.getItem('spendPercentage'))  || 30
+    const name   = sessionStorage.getItem('fullName') || ''
+    const save   = parseFloat(sessionStorage.getItem('savePercentage'))   || 0
+    const invest = parseFloat(sessionStorage.getItem('investPercentage')) || 0
+    const spend  = parseFloat(sessionStorage.getItem('spendPercentage'))  || 0
 
-    user.value.id             = sessionStorage.getItem('userId') || 'user-001'
+    user.value.id             = sessionStorage.getItem('userId') || ''
     user.value.name           = name
     user.value.customerType   = sessionStorage.getItem('customerType') || localStorage.getItem('customerType') || 'Retail'
     user.value.avatarInitials = getInitials(name)
