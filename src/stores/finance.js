@@ -31,6 +31,8 @@ export const useFinanceStore = defineStore('finance', () => {
   const user = ref({
     id:              sessionStorage.getItem('userId')  || 'user-001',
     name:            sessionName,
+    email:           sessionStorage.getItem('email')   || 'isabel@example.com',
+    phone:           sessionStorage.getItem('phone')   || '+65 9123 4567',
     customerType:    sessionCustomerType,
     checkingAccount: '***-***-4821',
     avatarInitials:  getInitials(sessionName),
@@ -121,7 +123,7 @@ export const useFinanceStore = defineStore('finance', () => {
   const CAT_META = {
     Food:      { icon: '🍜', color: '#F87171' },
     Groceries: { icon: '🛒', color: '#34D399' },
-    Entertain: { icon: '🎬', color: '#818CF8' },
+    Entertainment: { icon: '🎬', color: '#818CF8' },
     Shopping:  { icon: '🛍️', color: '#F59E0B' },
     Transport: { icon: '🚗', color: '#38BDF8' },
     Sports:    { icon: '🏃', color: '#A3E635' },
@@ -140,7 +142,9 @@ export const useFinanceStore = defineStore('finance', () => {
 
     transactions.value.forEach(txn => {
       if (txn.amount < 0) {
-        const cat = txn.category || 'Other'
+        let cat = txn.category || 'Other'
+        if (cat === 'Entertain') cat = 'Entertainment'
+
         if (!breakdown[cat]) breakdown[cat] = 0
         breakdown[cat] += Math.abs(txn.amount)
       }
@@ -220,6 +224,8 @@ export const useFinanceStore = defineStore('finance', () => {
 
     user.value.id             = sessionStorage.getItem('userId') || ''
     user.value.name           = name
+    user.value.email          = sessionStorage.getItem('email') || ''
+    user.value.phone          = sessionStorage.getItem('phone') || ''
     user.value.customerType   = sessionStorage.getItem('customerType') || localStorage.getItem('customerType') || 'Retail'
     user.value.avatarInitials = getInitials(name)
     debitCard.value.cardholderName = name.toUpperCase()
@@ -324,7 +330,11 @@ export const useFinanceStore = defineStore('finance', () => {
         const rawNarrative = t.narrative || '—'
         // Extract category from [Category] prefix
         const catMatch = rawNarrative.match(/^\[(.*?)\]/)
-        const category = catMatch ? catMatch[1] : (t.category || t.Category || '')
+        let category   = catMatch ? catMatch[1] : (t.category || t.Category || '')
+
+        // Normalise legacy category names
+        if (category === 'Entertain') category = 'Entertainment'
+
         // Remove the prefix from the displayed merchant name
         const merchant = catMatch ? rawNarrative.replace(/^\[.*?\]\s?/, '') : rawNarrative
 

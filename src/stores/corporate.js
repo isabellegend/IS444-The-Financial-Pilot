@@ -32,8 +32,10 @@ export const useCorporateStore = defineStore('corporate', () => {
         .filter(u => (u.customerType || '').toLowerCase() === 'retail')
         .map(u => {
           const name = u.fullName || '—'
-          // Isabel's salary is 8000 per user request
-          const salary = (name.toLowerCase().includes('isabel')) ? 8000 : 0
+          // Hardcode salaries for demo purposes per user request
+          let salary = 0
+          if (name.toLowerCase().includes('isabel')) salary = 8000
+          else if (name.toLowerCase().includes('shaun')) salary = 10000
           
           return {
             id:              String(u.userId),

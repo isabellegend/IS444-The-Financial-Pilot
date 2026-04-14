@@ -22,9 +22,9 @@ export async function getTransactions(userId, { limit = 10 } = {}) {
   const all = [
     { id: 'txn-001', date: '2026-03-24', merchant: 'Grab Food',       category: 'Food',       amount: -18.90,  status: 'settled' },
     { id: 'txn-002', date: '2026-03-23', merchant: 'FairPrice Online', category: 'Groceries',  amount: -67.40,  status: 'settled' },
-    { id: 'txn-003', date: '2026-03-22', merchant: 'Netflix',          category: 'Entertain',  amount: -18.98,  status: 'settled' },
+    { id: 'txn-003', date: '2026-03-22', merchant: 'Netflix',          category: 'Entertainment',  amount: -18.98,  status: 'settled' },
     { id: 'txn-004', date: '2026-03-21', merchant: 'Uniqlo ION',       category: 'Shopping',   amount: -89.00,  status: 'settled' },
-    { id: 'txn-005', date: '2026-03-20', merchant: 'Spotify',          category: 'Entertain',  amount: -9.98,   status: 'settled' },
+    { id: 'txn-005', date: '2026-03-20', merchant: 'Spotify',          category: 'Entertainment',  amount: -9.98,   status: 'settled' },
     { id: 'txn-006', date: '2026-03-19', merchant: 'Shell Buona Vista', category: 'Transport', amount: -55.00,  status: 'settled' },
     { id: 'txn-007', date: '2026-03-18', merchant: 'Koufu @ One North', category: 'Food',      amount: -8.50,   status: 'settled' },
     { id: 'txn-008', date: '2026-03-17', merchant: 'Amazon SG',        category: 'Shopping',   amount: -112.00, status: 'settled' },

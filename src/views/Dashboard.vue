@@ -69,13 +69,32 @@
                 :stroke-dasharray="`${seg.length} ${CIRCUMFERENCE - seg.length}`"
                 :transform="`rotate(${seg.startAngle}, 50, 50)`"
                 class="donut-seg"
+                :class="{ 'donut-seg--active': activeSeg === seg.key }"
+                @mouseenter="activeSeg = seg.key"
+                @mouseleave="activeSeg = null"
               />
+
+              <!-- Center Text -->
+              <g class="donut-center-text" v-if="activeSegInfo">
+                <text x="50" y="48" text-anchor="middle" class="center-pct mono" :style="{ fill: activeSegInfo.color }">
+                  {{ activeSegInfo.pct }}%
+                </text>
+                <text x="50" y="62" text-anchor="middle" class="center-label">
+                  {{ activeSegInfo.label }}
+                </text>
+              </g>
             </svg>
           </div>
 
           <!-- Breakdown rows -->
           <div class="split-rows">
-            <div v-for="row in splitRows" :key="row.key" class="split-row">
+            <div 
+              v-for="row in splitRows" :key="row.key" 
+              class="split-row"
+              :class="{ 'split-row--active': activeSeg === row.key }"
+              @mouseenter="activeSeg = row.key"
+              @mouseleave="activeSeg = null"
+            >
               <div class="split-row__left">
                 <span class="dot" :style="{ background: row.color }" />
                 <span>{{ row.label }}</span>
@@ -244,6 +263,7 @@ import { useFinanceStore } from '../stores/finance.js'
 import BucketCard from '../components/BucketCard.vue'
 
 const store = useFinanceStore()
+const activeSeg = ref(null)
 onMounted(() => {
   store.refreshDashboard()
   store.refreshSplitSettings()
@@ -271,9 +291,9 @@ const splitRows = [
 const donutSegments = computed(() => {
   const s = store.splitSettings
   const segs = [
-    { key: 'save',   pct: s.save,   color: '#00D4C8' },
-    { key: 'invest', pct: s.invest, color: '#F5C842' },
-    { key: 'spend',  pct: s.spend,  color: '#A855F7' },
+    { key: 'save',   pct: s.save,   color: '#00D4C8', label: 'Save' },
+    { key: 'invest', pct: s.invest, color: '#F5C842', label: 'Invest' },
+    { key: 'spend',  pct: s.spend,  color: '#A855F7', label: 'Spend' },
   ]
   let cumPct = 0
   const GAP = 1.2  // visual gap between segments (arc units)
@@ -284,6 +304,10 @@ const donutSegments = computed(() => {
     return { ...seg, length, startAngle }
   })
 })
+
+const activeSegInfo = computed(() => 
+  donutSegments.value.find(s => s.key === activeSeg.value)
+)
 
 // ── Goal radial arc ─────────────────────────────────────────────
 const goalArcLength = computed(() =>
@@ -432,7 +456,20 @@ function fmtK(n) {
 .donut-wrap { width: 108px; flex-shrink: 0; }
 .donut-svg  { width: 100%; height: auto; display: block; }
 .donut-track { stroke: var(--border); }
-.donut-seg   { transition: stroke-dasharray 0.9s cubic-bezier(0.4,0,0.2,1); }
+.donut-seg   { 
+  transition: all 0.3s ease; 
+  cursor: pointer;
+}
+.donut-seg:hover, .donut-seg--active {
+  stroke-width: 15;
+  filter: drop-shadow(0 0 5px currentColor);
+}
+
+.donut-center-text { pointer-events: none; }
+.center-pct { font-size: 16px; font-weight: 700; }
+.center-label { font-size: 8px; fill: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.center-total { font-size: 9px; fill: var(--text-3); font-weight: 500; }
+
 .donut-label-sm  { fill: var(--text-3); }
 .donut-label-val { fill: var(--text); }
 
@@ -443,6 +480,13 @@ function fmtK(n) {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  padding: 0.4rem;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+  cursor: default;
+}
+.split-row--active {
+  background: var(--surface-2);
 }
 .split-row__left {
   display: flex;

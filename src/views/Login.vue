@@ -89,8 +89,13 @@
             <input v-model="signup.fullName" type="text" placeholder="e.g. Alex Tan Wei Ming" required />
           </div>
           <div class="field">
-            <label>NRIC</label>
-            <input v-model="signup.nric" type="text" placeholder="e.g. S1234567A" required />
+            <label>{{ customerType === 'Corporate' ? 'UEN' : 'NRIC' }}</label>
+            <input
+              v-model="signup.nric"
+              type="text"
+              :placeholder="customerType === 'Corporate' ? 'e.g. 202112345W' : 'e.g. S1234567A'"
+              required
+            />
           </div>
         </div>
         <div class="field-row">
@@ -285,6 +290,7 @@ async function handleLogin() {
     sessionStorage.setItem('userId',          data.Id)
     sessionStorage.setItem('fullName',        data.FullName)
     sessionStorage.setItem('email',           data.Email)
+    sessionStorage.setItem('phone',           data.PhoneNumber || '+65 9123 4567')
     sessionStorage.setItem('savePercentage',  data.SavePercentage)
     sessionStorage.setItem('investPercentage',data.InvestPercentage)
     sessionStorage.setItem('spendPercentage', data.SpendPercentage)
@@ -348,6 +354,8 @@ async function handleSignup() {
     sessionStorage.setItem('nric',              sessionNric)
     sessionStorage.setItem('customerId',        customerId)
     sessionStorage.setItem('accountHolderName', sessionAccountHolder)
+    sessionStorage.setItem('email',             signup.value.email)
+    sessionStorage.setItem('phone',             signup.value.phoneNumber)
 
     // Step 4 — POST /RegisterAccount
     await registerAccount({
