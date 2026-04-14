@@ -215,46 +215,16 @@
       </div><!-- end emp-table -->
     </div><!-- end section-card -->
 
-    <!-- Payroll history -->
-    <div class="section-card">
-      <div class="section-header">
-        <h3>Payroll History</h3>
-      </div>
-      <div class="history-list">
-        <div v-for="run in store.payrollHistory" :key="run.id" class="history-row">
-          <div class="history-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <div class="history-info">
-            <span class="history-month">{{ run.month }}</span>
-            <span class="history-detail">{{ run.employeeCount }} employees credited</span>
-          </div>
-          <div class="history-meta">
-            <span class="history-amount mono">S${{ fmt(run.totalPaid) }}</span>
-            <span class="history-date mono">{{ fmtDate(run.processedAt.split('T')[0]) }}</span>
-          </div>
-          <span class="status-badge status-badge--credited">
-            <span class="status-dot" />Completed
-          </span>
-        </div>
-        <div v-if="store.payrollHistory.length === 0" class="emp-empty">No payroll runs yet.</div>
-      </div>
-    </div>
-
     <!-- Recent Transactions -->
-    <div class="section-card">
-      <div class="section-header">
+    <div class="card txn-card">
+      <div class="txn-header">
         <h3>Recent Transactions</h3>
-        <span class="label-sm">Checking account activity</span>
+        <span class="label-sm">{{ store.transactions.length }} transactions</span>
       </div>
       <div v-if="store.isLoadingTransactions" class="emp-empty">Loading transactions...</div>
       <div v-else-if="store.transactions.length === 0" class="emp-empty">No transactions yet.</div>
       <div v-else class="txn-list">
-        <div v-for="txn in store.transactions.slice(0, 10)" :key="txn.id" class="txn-row">
+        <div v-for="txn in store.transactions" :key="txn.id" class="txn-row">
           <div class="txn-icon" :class="txn.amount < 0 ? 'txn-icon--debit' : 'txn-icon--credit'">
             <svg v-if="txn.amount < 0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
@@ -265,14 +235,19 @@
           </div>
           <div class="txn-info">
             <span class="txn-merchant">{{ txn.merchant }}</span>
-            <span class="txn-meta">{{ txn.type }} · {{ txn.date }}</span>
+            <span class="txn-meta">
+              <span class="txn-ref mono">{{ txn.id }}</span> · {{ fmtDate(txn.date) }}
+            </span>
           </div>
-          <span class="txn-amount mono" :class="txn.amount < 0 ? 'txn-debit' : 'txn-credit'">
-            {{ txn.amount < 0 ? '-' : '+' }}S$ {{ fmt(Math.abs(txn.amount)) }}
-          </span>
+          <div class="txn-right">
+            <span class="mono txn-amount" :class="txn.amount > 0 ? 'amount-pos' : 'amount-neg'">
+              {{ txn.amount > 0 ? '+' : '−' }}S$ {{ Math.abs(txn.amount).toFixed(2) }}
+            </span>
+            <span class="txn-balance mono">Bal: S$ {{ txn.balanceAfter != null ? Number(txn.balanceAfter).toFixed(2) : '—' }}</span>
+          </div>
         </div>
       </div>
-    </div>
+    </div><!-- end txn-card -->
   </div>
 </template>
 
@@ -686,33 +661,66 @@ function fmtDate(iso) {
 
 .emp-empty { padding: 2.5rem; text-align: center; color: var(--text-3); font-size: 0.85rem; }
 
-/* History */
-.history-list { display: flex; flex-direction: column; }
-.history-row {
+/* Transactions */
+.txn-card { }
+.txn-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+.txn-header h3 { font-size: 1rem; }
+.label-sm     { font-size: 0.75rem; color: var(--text-3); }
+.txn-list { display: flex; flex-direction: column; gap: 0; }
+.txn-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
   border-bottom: 1px solid var(--border);
   transition: background var(--tr);
 }
-.history-row:last-child { border-bottom: none; }
-.history-row:hover { background: var(--surface-2); }
-.history-icon {
-  width: 36px; height: 36px;
+.txn-row:last-child { border-bottom: none; }
+.txn-row:hover { background: var(--surface-2); margin: 0 -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; border-radius: 0; }
+.txn-icon {
+  width: 38px; height: 38px;
   border-radius: 10px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
   flex-shrink: 0;
 }
-.history-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.history-month { font-size: 0.875rem; font-weight: 600; color: var(--text); }
-.history-detail { font-size: 0.75rem; color: var(--text-3); }
-.history-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-right: 1rem; }
-.history-amount { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.history-date { font-size: 0.72rem; color: var(--text-3); }
+.txn-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.txn-merchant {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.txn-meta { font-size: 0.72rem; color: var(--text-3); }
+.txn-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+.txn-icon--debit  { background: rgba(248,113,113,0.12); color: #F87171; }
+.txn-icon--credit { background: rgba(0,212,200,0.12);  color: var(--teal); }
+.txn-amount  { font-size: 0.875rem; font-weight: 500; }
+.amount-neg  { color: #F87171; }
+.amount-pos  { color: var(--teal); }
+.txn-ref     { color: var(--text-3); }
+.txn-balance { font-size: 0.68rem; color: var(--text-3); }
 
 .mono { font-family: var(--font-mono); }
 
@@ -857,28 +865,4 @@ function fmtDate(iso) {
 }
 @media (max-width: 480px) { .stats-row { grid-template-columns: 1fr; } }
 
-/* Transactions */
-.txn-list { display: flex; flex-direction: column; gap: 0.25rem; }
-.txn-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 0;
-  border-bottom: 1px solid var(--border);
-}
-.txn-row:last-child { border-bottom: none; }
-.txn-icon {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--card);
-}
-.txn-icon--debit  { background: rgba(248,113,113,0.12); color: #F87171; }
-.txn-icon--credit { background: rgba(0,212,200,0.12);   color: #00D4C8; }
-.txn-info { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
-.txn-merchant { font-size: 0.85rem; font-weight: 500; color: var(--text); }
-.txn-meta { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
-.txn-amount { font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
-.txn-debit  { color: #F87171; }
-.txn-credit { color: #00D4C8; }
 </style>

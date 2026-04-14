@@ -246,6 +246,7 @@ import BucketCard from '../components/BucketCard.vue'
 const store = useFinanceStore()
 onMounted(() => {
   store.refreshDashboard()
+  store.refreshSplitSettings()
   store.fetchTransactions()
 })
 

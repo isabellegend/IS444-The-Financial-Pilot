@@ -22,6 +22,10 @@ export function getAllUsers() {
   return userApi.get('/GetAllUsers')
 }
 
+export function getUserByNRIC(nric) {
+  return userApi.get('/GetUserByNRIC', { params: { NRIC: nric } })
+}
+
 export function createUser(payload) {
   return userApi.post('/Users', payload)
 }

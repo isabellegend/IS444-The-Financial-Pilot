@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { optimizeSplit } from '../services/goalService.js'
-import { getTransactionHistory, updateUserPercentage } from '../api/users.js'
+import { getTransactionHistory, updateUserPercentage, getUserByNRIC } from '../api/users.js'
 import { getDashboardMetrics } from '../api/dashboard.js'
 import { updateSplit } from '../api/chatbot.js'
 
@@ -284,6 +284,37 @@ export const useFinanceStore = defineStore('finance', () => {
     }
   }
 
+  async function refreshSplitSettings() {
+    const nric = sessionStorage.getItem('nric')
+    if (!nric) return
+
+    console.log('[refreshSplitSettings] Fetching latest split for NRIC:', nric)
+    console.log('[refreshSplitSettings] Current store values → save:', splitSettings.value.save, 'invest:', splitSettings.value.invest, 'spend:', splitSettings.value.spend)
+    console.log('[refreshSplitSettings] sessionStorage → save:', sessionStorage.getItem('savePercentage'), 'invest:', sessionStorage.getItem('investPercentage'), 'spend:', sessionStorage.getItem('spendPercentage'))
+
+    try {
+      const { data } = await getUserByNRIC(nric)
+      console.log('[refreshSplitSettings] API response:', JSON.stringify(data, null, 2))
+
+      const save   = parseFloat(data.savePercentage)   || 0
+      const invest = parseFloat(data.investPercentage) || 0
+      const spend  = parseFloat(data.spendPercentage)  || 0
+
+      console.log('[refreshSplitSettings] Parsed → save:', save, 'invest:', invest, 'spend:', spend)
+
+      splitSettings.value  = { save, invest, spend }
+      pendingSettings.value = { save, invest, spend }
+
+      sessionStorage.setItem('savePercentage',   save)
+      sessionStorage.setItem('investPercentage', invest)
+      sessionStorage.setItem('spendPercentage',  spend)
+
+      console.log('[refreshSplitSettings] Store and sessionStorage updated.')
+    } catch (err) {
+      console.error('[refreshSplitSettings] Failed to fetch user:', err?.response?.data ?? err.message)
+    }
+  }
+
   async function fetchTransactions() {
     isLoadingTransactions.value = true
     try {
@@ -319,6 +350,12 @@ export const useFinanceStore = defineStore('finance', () => {
     const s = pendingSettings.value
     if (s.save + s.invest + s.spend !== 100) return
 
+    // Update store and sessionStorage immediately so navigation doesn't revert
+    splitSettings.value = { ...s }
+    sessionStorage.setItem('savePercentage',   s.save)
+    sessionStorage.setItem('investPercentage', s.invest)
+    sessionStorage.setItem('spendPercentage',  s.spend)
+
     isUpdatingSplit.value = true
     splitUpdateError.value = ''
     try {
@@ -330,12 +367,6 @@ export const useFinanceStore = defineStore('finance', () => {
         spendPercentage:  s.spend,
       })
       console.log('[UpdateUserPercentage] response:', JSON.stringify(data, null, 2))
-
-      // Persist to store and session
-      splitSettings.value = { ...s }
-      sessionStorage.setItem('savePercentage',   s.save)
-      sessionStorage.setItem('investPercentage', s.invest)
-      sessionStorage.setItem('spendPercentage',  s.spend)
 
       settingsSaved.value = true
       setTimeout(() => { settingsSaved.value = false }, 2500)
@@ -376,6 +407,11 @@ export const useFinanceStore = defineStore('finance', () => {
     pendingSettings.value = { ...split }
     splitSettings.value   = { ...split }
 
+    // Persist immediately so sessionStorage stays in sync
+    sessionStorage.setItem('savePercentage',   split.save)
+    sessionStorage.setItem('investPercentage', split.invest)
+    sessionStorage.setItem('spendPercentage',  split.spend)
+
     isApplyingSplit.value = true
     try {
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
@@ -411,7 +447,7 @@ export const useFinanceStore = defineStore('finance', () => {
     lastSplitEvent, CAT_META, categoryBreakdown,
     totalBalance, primaryGoal, primaryGoalPct, spendLimitPct,
     salaryAmount, savePct, investPct, spendPct, updatedAt, spentThisMonth,
-    initFromSession, refreshDashboard, fetchTransactions, approveSplitSettings, sendChat,
+    initFromSession, refreshDashboard, refreshSplitSettings, fetchTransactions, approveSplitSettings, sendChat,
     applySuggestedSplit,
   }
 })
