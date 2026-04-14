@@ -279,12 +279,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useCorporateStore } from '../stores/corporate.js'
-import { useFinanceStore } from '../stores/finance.js'
-import { useFinanceStore } from '../stores/finance.js'
 import { executeSalarySplitter } from '../api/salarySplitter.js'
 
-const store        = useCorporateStore()
-const financeStore = useFinanceStore()
+const store     = useCorporateStore()
 const activeTab = ref('all')
 
 onMounted(() => {
