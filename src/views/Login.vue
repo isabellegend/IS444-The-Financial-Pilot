@@ -210,9 +210,11 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginUser, createUser, registerAccount } from '../api/users.js'
 import { useFinanceStore } from '../stores/finance.js'
+import { useCorporateStore } from '../stores/corporate.js'
 
 const router  = useRouter()
 const store   = useFinanceStore()
+const corpStore = useCorporateStore()
 const mode         = ref('login')
 const customerType = ref('Retail')
 const loading      = ref(false)
@@ -292,8 +294,9 @@ async function handleLogin() {
     localStorage.setItem('role',         'employee')
     localStorage.setItem('customerType', ctype)
 
-    // Re-hydrate the store with the new user's session data before navigating
+    // Re-hydrate stores with the new user's session data before navigating
     store.initFromSession()
+    if (ctype === 'Corporate') corpStore.initFromSession()
 
     router.push(ctype === 'Corporate' ? '/corporate-dashboard' : '/dashboard')
   } catch (err) {

@@ -78,6 +78,10 @@ export const useFinanceStore = defineStore('finance', () => {
   const isUpdatingSplit     = ref(false)
   const splitUpdateError    = ref('')
 
+  // Pending investment tracking (when PlaceMarketOrder fails/skips)
+  const pendingInvestAmount = ref(0)
+  const pendingInvestInfo   = ref(null)  // { amount, conversionAmount, timestamp }
+
   // Last split event (calculated from salary session)
   const lastSplitEvent = computed(() => {
     const gross = salaryAmount.value || 8500
@@ -243,11 +247,38 @@ export const useFinanceStore = defineStore('finance', () => {
       syncGoalFromSession()
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       const { data } = await getDashboardMetrics(nric)
+
+      const depositBal  = parseFloat(data.DepositBalance)                   || 0
+      const portfolioBal = parseFloat(data.totalPortfolioSizeInBaseCurrency) || 0
+      const spendBal    = parseFloat(data.SpendWalletBalance)               || 0
+
+      // When PlaceMarketOrder fails/skips, the invest allocation is still in the
+      // TBank deposit account. Read pending invest tracked by corporate dashboard.
+      // Normalize NRIC to uppercase so keys always match regardless of case.
+      const nricKey = nric.toUpperCase()
+      const pendingInvestKey  = `fp_pendingInvest_${nricKey}`
+      const pendingInfoKey   = `fp_pendingInvestInfo_${nricKey}`
+      const pendingInvest    = parseFloat(localStorage.getItem(pendingInvestKey)) || 0
+
+      // Debug: show all pending invest keys in localStorage
+      const allPendingKeys = Object.keys(localStorage).filter(k => k.startsWith('fp_pendingInvest_'))
+      console.log('[refreshDashboard] session nric:', nric, '→ lookup key:', pendingInvestKey,
+        '→ value:', localStorage.getItem(pendingInvestKey),
+        '| All pending keys:', allPendingKeys.map(k => `${k}=${localStorage.getItem(k)}`).join(', '))
+
+      pendingInvestAmount.value = pendingInvest
+      try {
+        pendingInvestInfo.value = JSON.parse(localStorage.getItem(pendingInfoKey)) || null
+      } catch { pendingInvestInfo.value = null }
+
       balances.value = {
-        save:   parseFloat(data.DepositBalance)                   || 0,
-        invest: parseFloat(data.totalPortfolioSizeInBaseCurrency) || 0,
-        spend:  parseFloat(data.SpendWalletBalance)               || 0,
+        save:   Math.max(depositBal - pendingInvest, 0),
+        invest: portfolioBal + pendingInvest,
+        spend:  spendBal,
       }
+
+      console.log('[refreshDashboard] depositBal:', depositBal, 'pendingInvest:', pendingInvest,
+        '→ save:', balances.value.save, 'invest:', balances.value.invest, 'spend:', balances.value.spend)
     } finally {
       isRefreshing.value = false
     }
@@ -376,7 +407,7 @@ export const useFinanceStore = defineStore('finance', () => {
     user, balances, splitSettings, pendingSettings,
     goals, transactions, debitCard, chatMessages,
     isRefreshing, isChatLoading, settingsSaved, isApplyingSplit, isLoadingTransactions,
-    isUpdatingSplit, splitUpdateError,
+    isUpdatingSplit, splitUpdateError, pendingInvestAmount, pendingInvestInfo,
     lastSplitEvent, CAT_META, categoryBreakdown,
     totalBalance, primaryGoal, primaryGoalPct, spendLimitPct,
     salaryAmount, savePct, investPct, spendPct, updatedAt, spentThisMonth,

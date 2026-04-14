@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getAccountByNRIC, getAllUsers } from '../api/users.js'
+import { getAccountByNRIC, getAllUsers, getTransactionHistory } from '../api/users.js'
 
 export const useCorporateStore = defineStore('corporate', () => {
   function getInitials(name) {
@@ -102,6 +102,30 @@ export const useCorporateStore = defineStore('corporate', () => {
     pendingEmployees.value.reduce((sum, e) => sum + (e.salary || 0), 0)
   )
 
+  const transactions          = ref([])
+  const isLoadingTransactions = ref(false)
+
+  async function fetchTransactions() {
+    const nric = sessionStorage.getItem('nric')
+    if (!nric) return
+    isLoadingTransactions.value = true
+    try {
+      const { data } = await getTransactionHistory(nric)
+      const rawList = Array.isArray(data) ? data : (data?.List ?? data?.Transactions ?? [])
+      transactions.value = rawList.map(t => ({
+        id:           t.transactionId,
+        date:         t.transactionDate ? t.transactionDate.slice(0, 10) : '',
+        merchant:     t.narrative || '—',
+        type:         t.transactionType,
+        amount:       t.transactionType === 'DEBIT' ? -Number(t.amount) : Number(t.amount),
+        balanceAfter: Number(t.balanceAfter),
+        status:       'settled',
+      }))
+    } finally {
+      isLoadingTransactions.value = false
+    }
+  }
+
   function initFromSession() {
     const name = sessionStorage.getItem('fullName') || 'Corporate Admin'
     company.value.name           = name
@@ -147,7 +171,8 @@ export const useCorporateStore = defineStore('corporate', () => {
     company, employees, isLoadingEmployees, employeesError, payrollHistory,
     isCreditingId, isCreditingAll,
     accountBalance, accountCurrency, accountStatus, accountHolderName, isLoadingBalance,
+    transactions, isLoadingTransactions,
     totalPayroll, pendingCount, pendingPayroll, pendingEmployees,
-    initFromSession, fetchBalance, fetchEmployees, creditEmployee, creditAll,
+    initFromSession, fetchBalance, fetchEmployees, fetchTransactions, creditEmployee, creditAll,
   }
 })

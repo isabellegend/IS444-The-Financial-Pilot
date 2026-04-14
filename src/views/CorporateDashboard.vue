@@ -244,6 +244,35 @@
         <div v-if="store.payrollHistory.length === 0" class="emp-empty">No payroll runs yet.</div>
       </div>
     </div>
+
+    <!-- Recent Transactions -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>Recent Transactions</h3>
+        <span class="label-sm">Checking account activity</span>
+      </div>
+      <div v-if="store.isLoadingTransactions" class="emp-empty">Loading transactions...</div>
+      <div v-else-if="store.transactions.length === 0" class="emp-empty">No transactions yet.</div>
+      <div v-else class="txn-list">
+        <div v-for="txn in store.transactions.slice(0, 10)" :key="txn.id" class="txn-row">
+          <div class="txn-icon" :class="txn.amount < 0 ? 'txn-icon--debit' : 'txn-icon--credit'">
+            <svg v-if="txn.amount < 0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+            </svg>
+            <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+            </svg>
+          </div>
+          <div class="txn-info">
+            <span class="txn-merchant">{{ txn.merchant }}</span>
+            <span class="txn-meta">{{ txn.type }} · {{ txn.date }}</span>
+          </div>
+          <span class="txn-amount mono" :class="txn.amount < 0 ? 'txn-debit' : 'txn-credit'">
+            {{ txn.amount < 0 ? '-' : '+' }}S$ {{ fmt(Math.abs(txn.amount)) }}
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -251,7 +280,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCorporateStore } from '../stores/corporate.js'
 import { useFinanceStore } from '../stores/finance.js'
-import { debitSpendAccount, creditSpendAccount } from '../api/users.js'
+import { useFinanceStore } from '../stores/finance.js'
+import { executeSalarySplitter } from '../api/salarySplitter.js'
 
 const store        = useCorporateStore()
 const financeStore = useFinanceStore()
@@ -260,6 +290,7 @@ const activeTab = ref('all')
 onMounted(() => {
   store.fetchBalance()
   store.fetchEmployees()
+  store.fetchTransactions()
 })
 
 const filteredEmployees = computed(() => {
@@ -300,31 +331,87 @@ async function submitTransfer() {
   const amt = Number(transfer.value.amount)
   if (!amt || amt <= 0) { transferError.value = 'Enter a valid amount.'; return }
 
-  const payerNric     = sessionStorage.getItem('nric') || ''
   const recipientNric = transfer.value.recipientNric.trim().toUpperCase()
-  const narrative     = transfer.value.note.trim() || `Salary to ${recipientNric}`
-  const referenceId   = 'REF' + Date.now()
+  if (!recipientNric) { transferError.value = 'Enter a valid recipient NRIC.'; return }
 
   isTransferring.value = true
   try {
-    const { data: debitData } = await debitSpendAccount({
-      nric: payerNric, amount: amt, narrative, referenceId,
-    })
+    // Call OutSystems ExecuteSalarySplitter orchestrator
+    // It handles: GetRecipientByNRIC -> calc Save/Invest/Spend amounts -> credit each bucket
+    const payload = {
+      NRIC: recipientNric,
+      SalaryAmount: amt,
+      PayerNRIC: sessionStorage.getItem('nric') || '',
+    }
+    console.log('[ExecuteSalarySplitter] sending payload:', JSON.stringify(payload, null, 2))
 
-    await creditSpendAccount({
-      nric: recipientNric, amount: amt, narrative, referenceId,
-    })
+    const { data: receipt } = await executeSalarySplitter(payload)
 
-    if (debitData.balanceAfter != null) {
-      financeStore.balances.spend = Number(debitData.balanceAfter)
+    console.log('[ExecuteSalarySplitter] receipt:', JSON.stringify(receipt, null, 2))
+
+    // Determine if any buckets actually succeeded
+    const hasSpend = receipt.SpendTransferId && receipt.SpendTransferId !== '' && receipt.SpendTransferId !== '0'
+    const hasSave  = Number(receipt.SaveAmount) > 0
+    const anyBucketWorked = hasSpend || hasSave
+
+    // Only treat as total failure if NOTHING succeeded
+    if ((receipt.Status === 'Failed' || receipt.Status === 'Split Salary Failed') && !anyBucketWorked) {
+      transferError.value = receipt.ErrorMessage || 'Salary split failed in orchestrator.'
+      return
     }
 
-    // Mark employee as credited in the store
+    // Build warning for partial success (Save/Spend worked but Invest failed)
+    const isPartial = receipt.Status !== 'Success' && anyBucketWorked
+    const warning = isPartial ? ` (Note: Investment auto-buy skipped — funds held in deposit account)` : ''
+
+    // The orchestrator deposits Save+Invest combined into the TBank deposit account.
+    // If PlaceMarketOrder fails or is skipped (StockQuantity ≤ 0), the invest money
+    // is still sitting in the deposit account. Track it so Isabel's dashboard can
+    // split DepositBalance correctly between Save and Invest buckets.
+    //
+    // We detect invest failure by: InvestAmount > 0 but no InvestTransferId returned
+    // (meaning PlaceMarketOrder never succeeded).
+    const investAmt = Number(receipt.InvestAmount) || 0
+    // InvestTransferId is a real TBank order ID when PlaceMarketOrder succeeds.
+    // When skipped/failed, OutSystems sets it to "" or "SKIPPED-NO-SHARES" or "0".
+    const rawInvestId = (receipt.InvestTransferId || '').trim()
+    const investPlaced = rawInvestId !== '' && rawInvestId !== '0' && !rawInvestId.startsWith('SKIPPED')
+    console.log('[SalarySplitter] investAmt:', investAmt, 'investPlaced:', investPlaced, 'Status:', receipt.Status)
+
+    if (investAmt > 0 && !investPlaced) {
+      const key     = `fp_pendingInvest_${recipientNric}`
+      const infoKey = `fp_pendingInvestInfo_${recipientNric}`
+      const prev = parseFloat(localStorage.getItem(key)) || 0
+      const newTotal = prev + investAmt
+      localStorage.setItem(key, String(newTotal))
+
+      // Store rich info for the dashboard invest card display
+      const conversionAmt = Number(receipt.InvestConversionAmount) || 0
+      localStorage.setItem(infoKey, JSON.stringify({
+        amount:           newTotal,
+        conversionAmount: conversionAmt,
+        timestamp:        receipt.Timestamp || new Date().toISOString(),
+        reason:           receipt.Status || 'Stock purchase skipped',
+      }))
+      console.log(`[SalarySplitter] Stored pending invest for ${recipientNric}:`, newTotal)
+    }
+
+    // Mark employee as credited in the corporate store
     if (pendingEmpId.value) store.creditEmployee(pendingEmpId.value)
 
-    transferSuccess.value = `S$ ${amt.toFixed(2)} sent to ${recipientNric}. New balance: S$ ${Number(debitData.balanceAfter ?? financeStore.balances.spend).toFixed(2)}.`
+    // Refresh Alan's corporate account balance and transactions (should show decrease)
+    await Promise.all([store.fetchBalance(), store.fetchTransactions()])
+
+    const parts = []
+    if (receipt.SaveAmount)   parts.push(`Save: S$${Number(receipt.SaveAmount).toFixed(2)}`)
+    if (receipt.InvestAmount) parts.push(`Invest: S$${Number(receipt.InvestAmount).toFixed(2)}`)
+    if (receipt.SpendAmount)  parts.push(`Spend: S$${Number(receipt.SpendAmount).toFixed(2)}`)
+
+    transferSuccess.value = `S$ ${amt.toFixed(2)} salary split for ${recipientNric}. ${parts.join(' | ')}${warning}`
   } catch (err) {
+    console.error('[ExecuteSalarySplitter error]', err?.response?.data || err?.message)
     const msg = err?.response?.data?.Errors?.[0]
+      || err?.response?.data?.ErrorMessage
       || err?.response?.data?.message
       || err?.message
       || 'Transfer failed. Please try again.'
@@ -772,4 +859,29 @@ function fmtDate(iso) {
   .emp-dept, .emp-date { display: none; }
 }
 @media (max-width: 480px) { .stats-row { grid-template-columns: 1fr; } }
+
+/* Transactions */
+.txn-list { display: flex; flex-direction: column; gap: 0.25rem; }
+.txn-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.txn-row:last-child { border-bottom: none; }
+.txn-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--card);
+}
+.txn-icon--debit  { background: rgba(248,113,113,0.12); color: #F87171; }
+.txn-icon--credit { background: rgba(0,212,200,0.12);   color: #00D4C8; }
+.txn-info { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
+.txn-merchant { font-size: 0.85rem; font-weight: 500; color: var(--text); }
+.txn-meta { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
+.txn-amount { font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.txn-debit  { color: #F87171; }
+.txn-credit { color: #00D4C8; }
 </style>
