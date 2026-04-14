@@ -461,8 +461,8 @@ function fmtK(n) {
   cursor: pointer;
 }
 .donut-seg:hover, .donut-seg--active {
-  stroke-width: 15;
-  filter: drop-shadow(0 0 5px currentColor);
+  stroke-width: 14;
+  filter: drop-shadow(0 0 2px currentColor);
 }
 
 .donut-center-text { pointer-events: none; }

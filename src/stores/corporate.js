@@ -131,6 +131,7 @@ export const useCorporateStore = defineStore('corporate', () => {
   function initFromSession() {
     const name = sessionStorage.getItem('fullName') || 'Corporate Admin'
     company.value.name           = name
+    company.value.uen            = sessionStorage.getItem('nric') || '—'
     company.value.avatarInitials = getInitials(name)
   }
 
