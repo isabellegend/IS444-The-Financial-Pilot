@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const chatbotApi = axios.create({
-  baseURL: 'https://personal-ne1thpev.outsystemscloud.com/ChatbotUpdateSplit/rest/ChatBotUpdateSplit',
+  baseURL: 'https://personal-ne1thpev.outsystemscloud.com/ChatbotUpdateSplit/rest/UpdateSplitSettings',
   timeout: 12000,
   headers: {
     'Content-Type': 'application/json',

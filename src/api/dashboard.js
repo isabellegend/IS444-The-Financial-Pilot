@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const dashboardApi = axios.create({
-  baseURL: 'https://personal-ne1thpev.outsystemscloud.com/AggregateDashboardData/rest/DashBoardMetrics',
+  baseURL: 'https://personal-ne1thpev.outsystemscloud.com/AggregateDashboardData/rest/AggregateDashboardData',
   timeout: 12000,
   headers: {
     'Content-Type': 'application/json',

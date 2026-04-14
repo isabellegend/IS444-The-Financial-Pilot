@@ -239,7 +239,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useFinanceStore } from '../stores/finance.js'
 import BucketCard from '../components/BucketCard.vue'
 
@@ -307,6 +307,22 @@ const debitTransactionsCount = computed(() =>
 )
 
 const recentTxns = computed(() => store.transactions.slice(0, 5))
+
+// ── Wallet Allocation hover tooltips ────────────────────────────
+const hoveredSeg = ref(null)
+const hoveredRow = ref(null)
+
+const hoveredSegData = computed(() => {
+  if (!hoveredSeg.value) return null
+  const seg = donutSegments.value.find(s => s.key === hoveredSeg.value)
+  const row = splitRows.find(r => r.key === hoveredSeg.value)
+  return {
+    label:  row?.label ?? '',
+    pct:    store.splitSettings[hoveredSeg.value] ?? 0,
+    amount: store.lastSplitEvent[hoveredSeg.value] ?? 0,
+    color:  seg?.color ?? '#fff',
+  }
+})
 
 // ── Formatters ──────────────────────────────────────────────────
 function fmt(n) {

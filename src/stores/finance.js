@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { optimizeSplit } from '../services/goalService.js'
 import { getTransactionHistory, updateUserPercentage, getUserByNRIC } from '../api/users.js'
 import { getDashboardMetrics } from '../api/dashboard.js'
-import { updateSplit } from '../api/chatbot.js'
 
 export const useFinanceStore = defineStore('finance', () => {
   // ── Session helpers ────────────────────────────────────────────
@@ -415,16 +414,16 @@ export const useFinanceStore = defineStore('finance', () => {
     isApplyingSplit.value = true
     try {
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
-      const { data } = await updateSplit({
+      await updateUserPercentage({
+        nric,
         savePercentage:   split.save,
         investPercentage: split.invest,
         spendPercentage:  split.spend,
-        nric,
       })
       chatMessages.value.push({
         id:      'msg-apply-' + Date.now(),
         role:    'assistant',
-        content: data.Message || 'Your split has been updated successfully.',
+        content: 'Your split has been updated successfully.',
         ts:      Date.now(),
       })
     } catch {

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const salarySplitterApi = axios.create({
-  baseURL: 'https://personal-hcjpmiar.outsystemscloud.com/FinancialPilotSalarySplitter/rest/SalarySplitter',
+  baseURL: 'https://personal-hcjpmiar.outsystemscloud.com/FinancialPilotSalarySplitter/rest/SplitSalary',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -18,7 +18,7 @@ const salarySplitterApi = axios.create({
  * @param {number} payload.SalaryAmount  - Total salary to split
  */
 export function executeSalarySplitter(payload) {
-  return salarySplitterApi.post('/ExecuteSalarySplitter', payload)
+  return salarySplitterApi.post('/ExecuteSplitSalary', payload)
 }
 
 export default salarySplitterApi
