@@ -34,6 +34,9 @@
         :bucket="b"
         :balance="store.balances[b.key]"
         :pct="store.splitSettings[b.key]"
+        :pending-invest="b.key === 'invest' && store.pendingInvestAmount > 0
+          ? { amount: store.pendingInvestAmount, ...store.pendingInvestInfo }
+          : null"
       />
     </section>
 

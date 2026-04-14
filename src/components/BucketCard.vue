@@ -22,6 +22,23 @@
       <span class="balance-value">{{ displayBalance }}</span>
     </div>
 
+    <!-- Pending invest banner -->
+    <div v-if="pendingInvest && pendingInvest.amount > 0" class="pending-banner">
+      <div class="pending-banner__icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="pending-banner__text">
+        <span class="pending-banner__title">Auto-invest pending</span>
+        <span class="pending-banner__sub">
+          S$ {{ pendingInvest.amount.toLocaleString('en-SG', { minimumFractionDigits: 2 }) }}
+          held in deposit&nbsp;·&nbsp;Stock order skipped
+        </span>
+      </div>
+    </div>
+
     <!-- Ring + subtitle -->
     <div class="bucket-card__foot">
       <div class="bucket-info">
@@ -46,9 +63,10 @@ import { ref, watch, computed } from 'vue'
 import CircularRing from './CircularRing.vue'
 
 const props = defineProps({
-  bucket:  { type: Object, required: true },
-  balance: { type: Number, default: 0 },
-  pct:     { type: Number, default: 0 },
+  bucket:        { type: Object, required: true },
+  balance:       { type: Number, default: 0 },
+  pct:           { type: Number, default: 0 },
+  pendingInvest: { type: Object, default: null },  // { amount, conversionAmount, reason }
 })
 
 // Animated counter
@@ -183,5 +201,39 @@ watch(() => props.balance, (val) => animateCounter(val), { immediate: true })
 .bucket-info__val {
   font-size: 0.8rem;
   color: var(--text-2);
+}
+
+/* Pending invest banner */
+.pending-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: rgba(245, 200, 66, 0.08);
+  border: 1px solid rgba(245, 200, 66, 0.25);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  margin-bottom: 1rem;
+}
+.pending-banner__icon {
+  flex-shrink: 0;
+  color: #F5C842;
+  margin-top: 1px;
+}
+.pending-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.pending-banner__title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #F5C842;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pending-banner__sub {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  line-height: 1.3;
 }
 </style>
