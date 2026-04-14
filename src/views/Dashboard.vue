@@ -70,13 +70,6 @@
                 :transform="`rotate(${seg.startAngle}, 50, 50)`"
                 class="donut-seg"
               />
-              <!-- Center labels -->
-              <text x="50" y="47" text-anchor="middle" font-size="13"
-                font-family="'Courier New', monospace" font-weight="700" fill="currentColor" class="donut-label-val">
-                {{ store.salaryAmount >= 1000 ? (store.salaryAmount / 1000).toFixed(1) + 'k' : fmt(store.salaryAmount) || '0.00' }}
-              </text>
-              <text x="50" y="61" text-anchor="middle" font-size="7.5"
-                font-family="system-ui, sans-serif" fill="currentColor" class="donut-label-sm">Total</text>
             </svg>
           </div>
 
@@ -99,7 +92,6 @@
                   />
                 </div>
                 <span class="mono split-amount">S$ {{ fmt(store.lastSplitEvent[row.key]) }}</span>
-                <span class="mono split-pct">{{ store.splitSettings[row.key] }}%</span>
               </div>
             </div>
           </div>
@@ -142,11 +134,11 @@
           <div class="goal-amounts-stack">
             <div class="goal-amount-row">
               <span class="goal-amount-label">Saved</span>
-              <span class="mono goal-amount-val">S$ {{ fmtK(store.primaryGoal.current) }}</span>
+              <span class="mono goal-amount-val">S$ {{ fmt(store.primaryGoal.current) }}</span>
             </div>
             <div class="goal-amount-row">
               <span class="goal-amount-label">Target</span>
-              <span class="mono goal-amount-val dimmed">S$ {{ fmtK(store.primaryGoal.target) }}</span>
+              <span class="mono goal-amount-val">S$ {{ fmt(store.primaryGoal.target) }}</span>
             </div>
             <div class="goal-amount-row">
               <span class="goal-amount-label">Remaining</span>
@@ -172,7 +164,7 @@
       <div class="card category-card">
         <h3>Spending Breakdown</h3>
         <p class="label-sm" style="margin-bottom: 1.25rem;">
-          Debit transactions · last {{ store.transactions.length }} records
+          Debit transactions · last {{ debitTransactionsCount }} records
         </p>
         <div v-if="spendByCategory.length === 0" class="cat-empty">
           No debit transactions yet
@@ -308,6 +300,10 @@ const spendByCategory = computed(() => {
     icon: cat.icon
   }))
 })
+
+const debitTransactionsCount = computed(() => 
+  store.transactions.filter(t => t.amount < 0).length
+)
 
 const recentTxns = computed(() => store.transactions.slice(0, 5))
 
@@ -490,9 +486,8 @@ function fmtK(n) {
   justify-content: space-between;
   align-items: center;
 }
-.goal-amount-label { font-size: 0.75rem; color: var(--text-3); }
-.goal-amount-val   { font-size: 0.85rem; color: var(--text); }
-.goal-amount-val.dimmed { color: var(--text-2); }
+.goal-amount-label { font-size: 0.85rem; color: var(--text-2); }
+.goal-amount-val   { font-size: 0.85rem; color: var(--text); font-weight: 600; }
 .goal-amount-val.danger { color: var(--danger); }
 .goal-amount-val.success { color: var(--success); }
 

@@ -13,7 +13,7 @@ export const useCorporateStore = defineStore('corporate', () => {
 
   const company = ref({
     name:           sessionName,
-    uen:            '201234567K',
+    uen:            sessionStorage.getItem('nric') || '—',
     bankAccount:    '***-***-8891',
     avatarInitials: getInitials(sessionName),
   })
@@ -30,18 +30,24 @@ export const useCorporateStore = defineStore('corporate', () => {
       const list = Array.isArray(data) ? data : []
       employees.value = list
         .filter(u => (u.customerType || '').toLowerCase() === 'retail')
-        .map(u => ({
-          id:              String(u.userId),
-          name:            u.fullName  || '—',
-          initials:        getInitials(u.fullName),
-          nric:            u.nric      || '',
-          email:           u.email     || '',
-          department:      '—',
-          salary:          0,
-          lastCreditDate:  null,
-          lastCreditAmount:null,
-          status:          'pending',
-        }))
+        .map(u => {
+          const name = u.fullName || '—'
+          // Isabel's salary is 8000 per user request
+          const salary = (name.toLowerCase().includes('isabel')) ? 8000 : 0
+          
+          return {
+            id:              String(u.userId),
+            name:            name,
+            initials:        getInitials(name),
+            nric:            u.nric      || '',
+            email:           u.email     || '',
+            department:      '—',
+            salary:          salary,
+            lastCreditDate:  null,
+            lastCreditAmount:null,
+            status:          'pending',
+          }
+        })
     } catch (err) {
       employeesError.value = err?.response?.data?.Errors?.[0]
         || err?.message

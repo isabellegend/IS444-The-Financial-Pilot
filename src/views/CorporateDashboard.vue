@@ -136,36 +136,7 @@
       </div>
     </div>
 
-    <!-- Account detail card -->
-    <div class="account-card">
-      <div class="account-card__left">
-        <div class="account-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="2" y="7" width="20" height="14" rx="2"/>
-            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-          </svg>
-        </div>
-        <div>
-          <p class="account-card__label">Checking Account</p>
-          <p class="account-card__name">{{ store.accountHolderName || store.company.name }}</p>
-        </div>
-      </div>
-      <div class="account-card__right">
-        <span v-if="store.isLoadingBalance" class="spinner spinner--sm" />
-        <template v-else>
-          <span class="account-card__bal mono">
-            {{ store.accountBalance != null ? fmtBalance(store.accountBalance) : '—' }}
-          </span>
-          <span class="account-card__currency">{{ store.accountCurrency }}</span>
-        </template>
-      </div>
-      <button class="refresh-btn" :disabled="store.isLoadingBalance" @click="store.fetchBalance()" title="Refresh balance">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-      </button>
-    </div>
+
 
     <!-- Employee table -->
     <div class="section-card">
@@ -198,7 +169,7 @@
         <div class="emp-row emp-row--header">
           <span>Employee</span>
           <span>NRIC</span>
-          <span>Email</span>
+          <span>Salary</span>
           <span>Last Credit</span>
           <span>Status</span>
           <span>Action</span>
@@ -213,11 +184,11 @@
             <div class="emp-avatar">{{ emp.initials }}</div>
             <div>
               <span class="emp-name">{{ emp.name }}</span>
-              <span class="emp-id mono">{{ emp.nric }}</span>
+              <span class="emp-id mono">{{ emp.email }}</span>
             </div>
           </div>
           <span class="emp-dept mono">{{ emp.nric || '—' }}</span>
-          <span class="emp-email">{{ emp.email || '—' }}</span>
+          <span class="emp-salary mono">S${{ fmt(emp.salary) }}</span>
           <span class="emp-date mono">{{ emp.lastCreditDate ? fmtDate(emp.lastCreditDate) : '—' }}</span>
           <span :class="['status-badge', `status-badge--${emp.status}`]">
             <span class="status-dot" />
@@ -309,9 +280,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCorporateStore } from '../stores/corporate.js'
 import { useFinanceStore } from '../stores/finance.js'
+import { useFinanceStore } from '../stores/finance.js'
 import { executeSalarySplitter } from '../api/salarySplitter.js'
 
-const store     = useCorporateStore()
+const store        = useCorporateStore()
 const financeStore = useFinanceStore()
 const activeTab = ref('all')
 
@@ -507,10 +479,19 @@ function fmtDate(iso) {
   gap: 0.2rem;
 }
 .stat-card--balance {
-  border-color: rgba(0,212,200,0.25);
-  background: linear-gradient(135deg, var(--surface), rgba(0,212,200,0.04));
+  border-color: rgba(0,212,200,0.35);
+  background: linear-gradient(135deg, var(--surface), rgba(0,212,200,0.06));
+  box-shadow: 0 8px 32px rgba(0,212,200,0.08);
 }
-.stat-card--balance .stat-value { color: var(--teal); }
+.stat-card--balance .stat-value { color: var(--teal); text-shadow: 0 0 12px var(--teal-glow); }
+
+.stat-card--alert {
+  border-color: rgba(245,200,66,0.35);
+  background: linear-gradient(135deg, var(--surface), rgba(245,200,66,0.06));
+  box-shadow: 0 8px 32px rgba(245,200,66,0.08);
+}
+.stat-card--alert .stat-value { color: var(--gold); text-shadow: 0 0 12px rgba(245,200,66,0.2); }
+
 .stat-value--loading {
   display: flex; align-items: center; gap: 0.4rem;
   font-size: 1rem;
@@ -647,6 +628,7 @@ function fmtDate(iso) {
 .emp-name { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .emp-id { display: block; font-size: 0.7rem; color: var(--text-3); margin-top: 1px; }
 .emp-dept  { font-size: 0.82rem; color: var(--text-2); }
+.emp-salary { font-size: 0.875rem; color: var(--text); font-weight: 600; }
 .emp-email { font-size: 0.8rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .emp-date  { font-size: 0.8rem; color: var(--text-2); }
 
@@ -675,9 +657,17 @@ function fmtDate(iso) {
   font-weight: 600;
   width: fit-content;
 }
-.status-badge--credited { background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid rgba(34,197,94,0.2); }
+.status-badge--credited { 
+  background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid rgba(34,197,94,0.2); 
+  animation: badgePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 .status-badge--pending  { background: rgba(245,200,66,0.1); color: var(--gold);    border: 1px solid rgba(245,200,66,0.2); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+@keyframes badgePop {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
 
 .credit-btn {
   display: inline-flex;
@@ -693,7 +683,7 @@ function fmtDate(iso) {
   white-space: nowrap;
 }
 .credit-btn--pending { background: var(--teal-dim); color: var(--teal); border-color: rgba(0,212,200,0.25); }
-.credit-btn--pending:hover:not(:disabled) { background: rgba(0,212,200,0.2); box-shadow: 0 0 12px var(--teal-glow); }
+.credit-btn--pending:hover:not(:disabled) { background: rgba(0,212,200,0.2); box-shadow: 0 0 12px var(--teal-glow); transform: translateY(-1px); }
 .credit-btn--done { background: transparent; color: var(--text-3); border-color: var(--border); cursor: default; }
 .credit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
