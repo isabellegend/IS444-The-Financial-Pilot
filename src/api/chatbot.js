@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const chatbotApi = axios.create({
-  baseURL: 'https://personal-ne1thpev.outsystemscloud.com/ChatbotUpdateSplit/rest/UpdateSplitSettings',
+  baseURL: '/chatbot-proxy/ChatbotUpdateSplit/rest/UpdateSplitSettings',
   timeout: 12000,
   headers: {
     'Content-Type': 'application/json',
@@ -10,7 +10,7 @@ const chatbotApi = axios.create({
 })
 
 export function updateSplit({ savePercentage, investPercentage, spendPercentage, nric }) {
-  return chatbotApi.put('/ChatBotUpdateSplit', null, {
+  return chatbotApi.put('/UpdateSplit', null, {
     params: {
       SavePercentage:   savePercentage,
       InvestPercentage: investPercentage,

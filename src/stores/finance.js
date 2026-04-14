@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { optimizeSplit } from '../services/goalService.js'
 import { getTransactionHistory, updateUserPercentage, getUserByNRIC } from '../api/users.js'
+import { updateSplit } from '../api/chatbot.js'
 import { getDashboardMetrics } from '../api/dashboard.js'
 
 export const useFinanceStore = defineStore('finance', () => {
@@ -377,6 +378,13 @@ export const useFinanceStore = defineStore('finance', () => {
       })
       console.log('[UpdateUserPercentage] response:', JSON.stringify(data, null, 2))
 
+      await updateSplit({
+        nric,
+        savePercentage:   s.save,
+        investPercentage: s.invest,
+        spendPercentage:  s.spend,
+      })
+
       settingsSaved.value = true
       setTimeout(() => { settingsSaved.value = false }, 2500)
     } catch (err) {
@@ -425,6 +433,12 @@ export const useFinanceStore = defineStore('finance', () => {
     try {
       const nric = sessionStorage.getItem('nric') || 'T9992445Z'
       await updateUserPercentage({
+        nric,
+        savePercentage:   split.save,
+        investPercentage: split.invest,
+        spendPercentage:  split.spend,
+      })
+      await updateSplit({
         nric,
         savePercentage:   split.save,
         investPercentage: split.invest,
